@@ -89,21 +89,7 @@ class HomeScreenState extends State<HomeScreen> {
                   itemCount: posts.length,
                   itemBuilder: (context, index) {
                     final post = posts[index];
-                    return _buildPost(
-                      id: post.id,
-                      username: post.username,
-                      profession: post.profession,
-                      isVerified: post.isVerified,
-                      verifiedOffset: 128,
-                      postImagePath: post.postImagePath,
-                      iconPath: post.iconPath,
-                      isOwner: post.username == _loggedInUsername,
-                      isProduct: post.isProduct,
-                      productname: post.productname,
-                      variation: post.variation,
-                      quantity: post.quantity,
-                      price: post.price,
-                    );
+                    return _buildPost(post);
                   },
                 );
               },
@@ -168,29 +154,22 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildPost({
-    required String id,
-    required String username,
-    required String profession,
-    required bool isVerified,
-    required double verifiedOffset,
-    required String postImagePath,
-    required String iconPath,
-    required bool isOwner,
-    bool isProduct = false,
-    String? productname,
-    String? variation,
-    int? quantity,
-    double? price,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
+  Widget _buildPost(Post post) {
+    // Determine if the logged-in user is the owner of the post
+    bool isOwner = post.username == _loggedInUsername;
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(vertical: 0, horizontal: 0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header with user info and delete button
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+            padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
+<<<<<<< HEAD
                 GestureDetector(
                   onTap: () {
                     // Navigate to user profile screen when profile picture is clicked
@@ -209,11 +188,19 @@ class HomeScreenState extends State<HomeScreen> {
                   child: Image.asset(iconPath, width: 43, height: 43),
                 ),
                 const SizedBox(width: 10),
+=======
+                CircleAvatar(
+                  backgroundImage: NetworkImage(post.iconPath),
+                  radius: 20,
+                ),
+                const SizedBox(width: 12),
+>>>>>>> afe4a4c41ef75ac722e9a3d0344b2bea8a1ddc25
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
+<<<<<<< HEAD
                         GestureDetector(
                           onTap: () {
                             // Navigate to user profile screen when username is clicked
@@ -235,22 +222,30 @@ class HomeScreenState extends State<HomeScreen> {
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
                             ),
+=======
+                        Text(
+                          post.username,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+>>>>>>> afe4a4c41ef75ac722e9a3d0344b2bea8a1ddc25
                           ),
                         ),
-                        if (isVerified) ...[
-                          const SizedBox(width: 4),
-                          Image.asset(
-                            'graphics/Verified Icon.png',
-                            width: 13,
-                            height: 12,
-                            fit: BoxFit.contain,
+                        if (post.isVerified)
+                          Padding(
+                            padding: EdgeInsets.only(left: post.verifiedOffset),
+                            child: const Icon(
+                              Icons.verified,
+                              color: Colors.blue,
+                              size: 16,
+                            ),
                           ),
-                        ],
                       ],
                     ),
                     Text(
-                      profession,
+                      post.profession,
                       style: const TextStyle(
+                        color: Colors.grey,
                         fontSize: 12,
                       ),
                     ),
@@ -259,83 +254,164 @@ class HomeScreenState extends State<HomeScreen> {
                 const Spacer(),
                 if (isOwner)
                   IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () async {
-                      final confirm = await showDialog<bool>(
+                    icon: const Icon(Icons.more_vert, size: 28),
+                    onPressed: () {
+                      // Show delete confirmation dialog
+                      showDialog(
                         context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Delete Post'),
-                          content: const Text('Are you sure you want to delete this post?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(false),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(true),
-                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                            ),
-                          ],
-                        ),
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            title: const Text('Delete Post'),
+                            content: const Text(
+                                'Are you sure you want to delete this post?'),
+                            actions: [
+                              TextButton(
+                                child: const Text('Cancel'),
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                              ),
+                              TextButton(
+                                child: const Text('Delete'),
+                                onPressed: () {
+                                  _deletePost(post.id);
+                                  Navigator.of(context).pop();
+                                },
+                              ),
+                            ],
+                          );
+                        },
                       );
-                      if (confirm == true) {
-                        await _deletePost(id);
-                      }
                     },
-                  )
-                else
-                  const Icon(Icons.more_vert),
+                  ),
               ],
             ),
           ),
-          Image.asset(
-            postImagePath,
-            height: 393,
-            width: double.infinity,
-            fit: BoxFit.cover,
-          ),
-          if (isProduct)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.shopping_cart),
-                label: const Text('Add to ArtVault'),
-                onPressed: () async {
-                  if (_loggedInUsername == null) return;
-                  await SupabaseService.addToVault(
-                    username: _loggedInUsername!,
-                    productname: productname ?? '',
-                    variation: variation ?? '',
-                    quantity: quantity ?? 1,
-                    price: price ?? 0.0,
-                    iconUrl: iconPath,
-                    imageUrl: postImagePath,
-                  );
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Added to ArtVault!')),
-                    );
-                  }
-                },
-              ),
+          // Post image
+          if (post.postImagePath.isNotEmpty)
+            Image.network(
+              post.postImagePath,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: 300, // Adjust height as needed
             ),
+          // Action buttons (like, comment, share, bookmark)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Image.asset('graphics/Heart.png', width: 25.5, height: 22.667),
-                const SizedBox(width: 15),
-                Image.asset('graphics/Comment.png', width: 25.5, height: 22.667),
-                const SizedBox(width: 15),
-                const Icon(Icons.send_outlined, size: 24),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(LucideIcons.heart, size: 28),
+                      onPressed: () {},
+                    ),
+                    IconButton(
+                      icon: const Icon(LucideIcons.message_circle, size: 28),
+                      onPressed: () {},
+                    ),
+                    IconButton(
+                      icon: const Icon(LucideIcons.send, size: 28),
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
+                // Product details section
+                if (post.isProduct &&
+                    post.productname != null &&
+                    post.productname!.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.blue),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'SHOP NOW',
+                      style: TextStyle(
+                        color: Colors.blue,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                 const Spacer(),
-                const Icon(Icons.bookmark_border, size: 24),
+                IconButton(
+                  icon: const Icon(Icons.bookmark_border, size: 28),
+                  onPressed: () {},
+                ),
+              ],
+            ),
+          ),
+          // Like count and caption
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '1,234 likes', // Placeholder for actual like count
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (post.caption.isNotEmpty)
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(color: Colors.black, fontSize: 14),
+                      children: [
+                        TextSpan(
+                          text: '${post.username} ',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        TextSpan(text: post.caption),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                const Text(
+                  'View all 42 comments', // Placeholder for comment count
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatTimeAgo(post.postDate),
+                  style: TextStyle(
+                    color: Colors.grey.shade500,
+                    fontSize: 10,
+                    letterSpacing: 0.5,
+                  ),
+                ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _formatTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inDays > 30) {
+      return '${(difference.inDays / 30).floor()} MONTHS AGO';
+    } else if (difference.inDays > 0) {
+      return '${difference.inDays} DAYS AGO';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} HOURS AGO';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} MINUTES AGO';
+    } else {
+      return 'JUST NOW';
+    }
   }
 }
 
