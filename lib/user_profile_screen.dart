@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'supabase_service.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:logging/logging.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String username;
@@ -14,30 +15,86 @@ class UserProfileScreen extends StatefulWidget {
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
   Map<String, dynamic>? profileData;
+  List<Map<String, dynamic>> userPosts = [];
   bool isLoading = true;
   bool isFollowing = false;
   bool isProcessing = false;
+  final _logger = Logger('UserProfileScreen');
 
   Future<void> loadProfile() async {
     setState(() {
       isLoading = true;
     });
 
-    // Fetch user profile data
-    final data = await SupabaseService.getUserByUsername(widget.username);
+    try {
+      // Fetch initial user data to get user_id
+      _logger.info('Fetching initial data for ${widget.username}');
+      final initialData = await SupabaseService.getUserByUsername(widget.username);
 
-    if (data != null && data['user_id'] != null) {
-      // Check if current user is following this user
-      final followStatus = await SupabaseService.isFollowing(data['user_id']);
+      if (initialData != null && (initialData['user_id'] != null || initialData['id'] != null)) {
+        final userId = initialData['user_id'] ?? initialData['id'] as String?;
+        if (userId == null) {
+            _logger.warning('User ID is null after fetching initial data for ${widget.username}.');
+            setState(() {
+                isLoading = false;
+                // Handle error: essential ID missing
+            });
+            return;
+        }
+        _logger.info('Fetched initial data for ${widget.username}, user ID: $userId. Now fetching full profile with counts.');
 
+        // Fetch full profile data including counts using the userId
+        final fullProfileData = await SupabaseService.getUserProfileById(userId);
+
+        if (fullProfileData != null) {
+          // Check if current user is following this user
+          final followStatus = await SupabaseService.isFollowing(userId);
+          _logger.info('Follow status for $userId: $followStatus');
+
+          // Fetch user's posts
+          List<Map<String, dynamic>> fetchedPosts = [];
+          try {
+            _logger.info('Fetching posts for user ID: $userId');
+            final postsResponse = await SupabaseService.supabase
+                .from('posts')
+                .select()
+                .eq('user_id', userId)
+                .order('created_at', ascending: false); // Assuming 'created_at' field for ordering
+            
+            fetchedPosts = List<Map<String, dynamic>>.from(postsResponse);
+            _logger.info('Fetched ${fetchedPosts.length} posts for user ID: $userId');
+          } catch (e) {
+            _logger.severe('Error fetching posts for user ID $userId: $e');
+            // Continue without posts if fetching fails, or handle error appropriately
+          }
+
+          setState(() {
+            profileData = fullProfileData; // Use the data with counts
+            userPosts = fetchedPosts; // Set the fetched posts
+            isFollowing = followStatus;
+            isLoading = false;
+          });
+        } else {
+          _logger.warning('Failed to fetch full profile data for user ID: $userId');
+          setState(() {
+            // Keep initial data if full profile fails, or handle error appropriately
+            profileData = initialData; 
+            isLoading = false;
+            // Consider showing an error message to the user
+          });
+        }
+      } else {
+        _logger.warning('Failed to fetch initial user data for ${widget.username} or user_id/id is null.');
+        setState(() {
+          isLoading = false;
+          // Handle error: user not found or essential ID missing
+        });
+      }
+    } catch (e) {
+      _logger.severe('Error in loadProfile for ${widget.username}: $e');
       setState(() {
-        profileData = data;
-        isFollowing = followStatus;
         isLoading = false;
-      });
-    } else {
-      setState(() {
-        isLoading = false;
+        // Handle general error
       });
     }
   }
@@ -86,23 +143,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _logger.info('UserProfileScreen initState for ${widget.username}');
     loadProfile();
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<String> postImages = [
-      'graphics/profile posts/post1.jpg',
-      'graphics/profile posts/post2.jpg',
-      'graphics/profile posts/post3.jpg',
-      'graphics/profile posts/post4.jpg',
-      'graphics/profile posts/post5.jpg',
-      'graphics/profile posts/post6.jpg',
-      'graphics/profile posts/post7.jpg',
-      'graphics/profile posts/post8.jpg',
-      'graphics/profile posts/post9.jpg',
-    ];
-
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -285,25 +331,53 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       Expanded(
                         child: TabBarView(
                           children: [
-                            // Posts Tab (placeholder images for now)
-                            GridView.builder(
-                              padding: const EdgeInsets.all(10),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 3,
-                                    crossAxisSpacing: 5,
-                                    mainAxisSpacing: 5,
+                            // Posts Tab
+                            userPosts.isEmpty && !isLoading
+                                ? const Center(child: Text("This user hasn't posted yet."))
+                                : GridView.builder(
+                                    padding: const EdgeInsets.all(10),
+                                    gridDelegate:
+                                        const SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: 3,
+                                          crossAxisSpacing: 5,
+                                          mainAxisSpacing: 5,
+                                        ),
+                                    itemCount: userPosts.length, // Use actual post count
+                                    itemBuilder:
+                                        (context, index) {
+                                          final post = userPosts[index];
+                                          final imageUrl = post['post_image_path'] as String?;
+                                          return ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: imageUrl != null && imageUrl.isNotEmpty
+                                                ? Image.network(
+                                                    imageUrl,
+                                                    fit: BoxFit.cover,
+                                                    loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                                                      if (loadingProgress == null) return child;
+                                                      return Center(
+                                                        child: CircularProgressIndicator(
+                                                          value: loadingProgress.expectedTotalBytes != null
+                                                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                              : null,
+                                                        ),
+                                                      );
+                                                    },
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      _logger.warning('Failed to load image: $imageUrl, Error: $error');
+                                                      return Container(
+                                                        color: Colors.grey[200],
+                                                        child: const Icon(Icons.broken_image, color: Colors.grey),
+                                                      );
+                                                    },
+                                                  )
+                                                : Container(
+                                                    color: Colors.grey[200],
+                                                    child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                                                  ),
+                                          );
+                                        },
                                   ),
-                              itemCount: postImages.length,
-                              itemBuilder:
-                                  (context, index) => ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.asset(
-                                      postImages[index],
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                            ),
 
                             // Products Tab
                             const Center(child: Text("Products Coming Soon")),
