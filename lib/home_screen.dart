@@ -153,43 +153,26 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-<<<<<<< HEAD
   Widget _buildPost(Post post) {
-=======
-  Widget _buildPost({
-    required String id,
-    required String username,
-    required String profession,
-    required bool isVerified,
-    required double verifiedOffset,
-    required String postImagePath,
-    required String iconPath,
-    required bool isOwner,
-    bool isProduct = false,
-    String? productname,
-    String? variation,
-    int? quantity,
-    double? price,
-  }) {
->>>>>>> origin/master
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
+    // Determine if the logged-in user is the owner of the post
+    bool isOwner = post.username == _loggedInUsername;
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(vertical: 0, horizontal: 0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Post header with user info
+          // Header with user info and delete button
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+            padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-                // User avatar
                 CircleAvatar(
-                  radius: 21.5,
-                  backgroundImage: post.profilePicture != null
-                      ? AssetImage(post.profilePicture!)
-                      : const AssetImage('graphics/Profile Icon.png'),
+                  backgroundImage: NetworkImage(post.iconPath),
+                  radius: 20,
                 ),
-                const SizedBox(width: 10),
-                // Username and profession
+                const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -199,25 +182,25 @@ class HomeScreenState extends State<HomeScreen> {
                           post.username,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                            fontSize: 16,
                           ),
                         ),
-                        if (post.userProfession?.toLowerCase() == 'artist') ...[
-                          const SizedBox(width: 4),
-                          Image.asset(
-                            'graphics/Verified Icon.png',
-                            width: 13,
-                            height: 12,
-                            fit: BoxFit.contain,
+                        if (post.isVerified)
+                          Padding(
+                            padding: EdgeInsets.only(left: post.verifiedOffset),
+                            child: const Icon(
+                              Icons.verified,
+                              color: Colors.blue,
+                              size: 16,
+                            ),
                           ),
-                        ],
                       ],
                     ),
                     Text(
-                      post.userProfession ?? 'User',
+                      post.profession,
                       style: const TextStyle(
-                        fontSize: 12,
                         color: Colors.grey,
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -225,110 +208,86 @@ class HomeScreenState extends State<HomeScreen> {
                 const Spacer(),
                 if (isOwner)
                   IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () async {
-                      final confirm = await showDialog<bool>(
+                    icon: const Icon(Icons.more_vert, size: 28),
+                    onPressed: () {
+                      // Show delete confirmation dialog
+                      showDialog(
                         context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Delete Post'),
-                          content: const Text('Are you sure you want to delete this post?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(false),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(true),
-                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                            ),
-                          ],
-                        ),
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            title: const Text('Delete Post'),
+                            content: const Text(
+                                'Are you sure you want to delete this post?'),
+                            actions: [
+                              TextButton(
+                                child: const Text('Cancel'),
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                              ),
+                              TextButton(
+                                child: const Text('Delete'),
+                                onPressed: () {
+                                  _deletePost(post.id);
+                                  Navigator.of(context).pop();
+                                },
+                              ),
+                            ],
+                          );
+                        },
                       );
-                      if (confirm == true) {
-                        await _deletePost(id);
-                      }
                     },
-                  )
-                else
-                  const Icon(Icons.more_vert),
+                  ),
               ],
             ),
           ),
-<<<<<<< HEAD
           // Post image
-          if (post.imageUrl != null)
-            Image.asset(
-              post.imageUrl!,
-              height: 393,
-              width: double.infinity,
+          if (post.postImagePath.isNotEmpty)
+            Image.network(
+              post.postImagePath,
               fit: BoxFit.cover,
+              width: double.infinity,
+              height: 300, // Adjust height as needed
             ),
-          // Post actions
-=======
-          Image.asset(
-            postImagePath,
-            height: 393,
-            width: double.infinity,
-            fit: BoxFit.cover,
-          ),
-          if (isProduct)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.shopping_cart),
-                label: const Text('Add to ArtVault'),
-                onPressed: () async {
-                  if (_loggedInUsername == null) return;
-                  await SupabaseService.addToVault(
-                    username: _loggedInUsername!,
-                    productname: productname ?? '',
-                    variation: variation ?? '',
-                    quantity: quantity ?? 1,
-                    price: price ?? 0.0,
-                    iconUrl: iconPath,
-                    imageUrl: postImagePath,
-                  );
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Added to ArtVault!')),
-                    );
-                  }
-                },
-              ),
-            ),
->>>>>>> origin/master
+          // Action buttons (like, comment, share, bookmark)
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.favorite_border, size: 28),
-                  onPressed: () {},
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(LucideIcons.heart, size: 28),
+                      onPressed: () {},
+                    ),
+                    IconButton(
+                      icon: const Icon(LucideIcons.message_circle, size: 28),
+                      onPressed: () {},
+                    ),
+                    IconButton(
+                      icon: const Icon(LucideIcons.send, size: 28),
+                      onPressed: () {},
+                    ),
+                  ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.chat_bubble_outline, size: 26),
-                  onPressed: () {},
-                ),
-                IconButton(
-                  icon: const Icon(Icons.send_outlined, size: 26),
-                  onPressed: () {},
-                ),
-                if (post.postType == 'product')
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8.0),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.blue),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'SHOP NOW',
-                        style: TextStyle(
-                          color: Colors.blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
+                // Product details section
+                if (post.isProduct &&
+                    post.productname != null &&
+                    post.productname!.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.blue),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'SHOP NOW',
+                      style: TextStyle(
+                        color: Colors.blue,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
@@ -347,7 +306,7 @@ class HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '1,234 likes',
+                  '1,234 likes', // Placeholder for actual like count
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -369,7 +328,7 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                 const SizedBox(height: 4),
                 const Text(
-                  'View all 42 comments',
+                  'View all 42 comments', // Placeholder for comment count
                   style: TextStyle(
                     color: Colors.grey,
                     fontSize: 14,

@@ -38,8 +38,11 @@ class Post {
   final String username;
   final String profession;
   final bool isVerified;
+  final double verifiedOffset;
   final String postImagePath;
   final String iconPath;
+  final String caption;
+  final DateTime postDate;
   final bool isProduct;
   final String? productname;
   final String? variation;
@@ -51,8 +54,11 @@ class Post {
     required this.username,
     required this.profession,
     required this.isVerified,
+    required this.verifiedOffset,
     required this.postImagePath,
     required this.iconPath,
+    required this.caption,
+    required this.postDate,
     required this.isProduct,
     this.productname,
     this.variation,
@@ -66,8 +72,11 @@ class Post {
       username: json['username'] as String,
       profession: json['profession'] as String,
       isVerified: json['is_verified'] as bool,
+      verifiedOffset: (json['verified_offset'] as num?)?.toDouble() ?? 4.0,
       postImagePath: json['post_image_path'] as String,
       iconPath: json['icon_path'] as String,
+      caption: json['caption'] as String? ?? '',
+      postDate: DateTime.parse(json['created_at'] as String),
       isProduct: json['is_product'] as bool? ?? false,
       productname: json['productname'] as String?,
       variation: json['variation'] as String?,
