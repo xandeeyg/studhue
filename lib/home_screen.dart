@@ -169,15 +169,14 @@ class HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-<<<<<<< HEAD
                 GestureDetector(
                   onTap: () {
                     // Navigate to user profile screen when profile picture is clicked
-                    if (username != _loggedInUsername) {
+                    if (post.username != _loggedInUsername) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => UserProfileScreen(username: username),
+                          builder: (context) => UserProfileScreen(username: post.username),
                         ),
                       );
                     } else {
@@ -185,30 +184,25 @@ class HomeScreenState extends State<HomeScreen> {
                       Navigator.pushNamed(context, "/profile");
                     }
                   },
-                  child: Image.asset(iconPath, width: 43, height: 43),
-                ),
-                const SizedBox(width: 10),
-=======
-                CircleAvatar(
-                  backgroundImage: NetworkImage(post.iconPath),
-                  radius: 20,
+                  child: CircleAvatar(
+                    backgroundImage: NetworkImage(post.iconPath),
+                    radius: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
->>>>>>> afe4a4c41ef75ac722e9a3d0344b2bea8a1ddc25
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-<<<<<<< HEAD
                         GestureDetector(
                           onTap: () {
                             // Navigate to user profile screen when username is clicked
-                            if (username != _loggedInUsername) {
+                            if (post.username != _loggedInUsername) {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => UserProfileScreen(username: username),
+                                  builder: (context) => UserProfileScreen(username: post.username),
                                 ),
                               );
                             } else {
@@ -217,18 +211,11 @@ class HomeScreenState extends State<HomeScreen> {
                             }
                           },
                           child: Text(
-                            username,
+                            post.username,
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                              fontSize: 16,
                             ),
-=======
-                        Text(
-                          post.username,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
->>>>>>> afe4a4c41ef75ac722e9a3d0344b2bea8a1ddc25
                           ),
                         ),
                         if (post.isVerified)
@@ -421,28 +408,18 @@ class SearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 34,
+      height: 36,
       decoration: BoxDecoration(
-        color: const Color(0xffd6d6d6),
-        borderRadius: BorderRadius.circular(5),
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(18),
       ),
-      child: const Row(
-        children: [
-          SizedBox(width: 8),
-          Icon(Icons.search, size: 20, color: Colors.grey),
-          SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search',
-                hintStyle: TextStyle(color: Color.fromRGBO(123, 123, 123, 1)),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.only(bottom: 12),
-              ),
-            ),
-          ),
-          SizedBox(width: 16),
-        ],
+      child: const TextField(
+        decoration: InputDecoration(
+          hintText: 'Search',
+          prefixIcon: Icon(Icons.search),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(vertical: 8),
+        ),
       ),
     );
   }

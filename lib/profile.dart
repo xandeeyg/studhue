@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'supabase_service.dart';
 import 'api_service.dart';
 
@@ -25,61 +26,115 @@ class _ProfileScreenState extends State<ProfileScreen> {
         isLoading = true;
       });
       
-      print('DEBUG: Attempting direct data fetch without authentication');
+      print('DEBUG: Attempting to fetch current user profile');
       
       try {
-        // Direct fetch of first user from database (for demo purposes)
-        final userData = await _supabase
-            .from('users')
-            .select()
-            .limit(1)
-            .single();
+        // Get the current authenticated user
+        final currentUser = _supabase.auth.currentUser;
+        
+        if (currentUser == null) {
+          print('DEBUG: No authenticated user found, trying to fetch from local storage');
+          
+          // Try to get user data from the users table using shared preferences or other stored ID
+          final userData = await SupabaseService.getUserProfile();
+          
+          if (userData == null) {
+            throw Exception('No user data found');
+          }
+          
+          print('DEBUG: Fetched user data: $userData');
+          
+          // Create profile with the user data
+          final userProfile = {
+            ...userData as Map<String, dynamic>,
+            'post_count': 0,
+            'followers': 0,
+            'following': 0,
+          };
+          
+          // Fetch this user's posts
+          try {
+            final posts = await _supabase
+                .from('posts')
+                .select()
+                .eq('user_id', userData['user_id'])
+                .order('post_date', ascending: false);
             
-        print('DEBUG: Fetched user data: $userData');
-        
-        if (userData == null) {
-          throw Exception('No user data found');
-        }
-        
-        // Create a mock profile with the user data
-        final mockProfile = {
-          ...userData as Map<String, dynamic>,
-          'post_count': 0,
-          'followers': 0,
-          'following': 0,
-        };
-        
-        // Fetch this user's posts
-        try {
-          final posts = await _supabase
-              .from('posts')
+            print('DEBUG: User posts: ${posts.length}');
+            
+            setState(() {
+              profileData = userProfile;
+              userPosts = List<Map<String, dynamic>>.from(posts ?? []);
+              isLoading = false;
+            });
+          } catch (postsError) {
+            print('DEBUG: Error fetching posts: $postsError');
+            setState(() {
+              profileData = userProfile;
+              userPosts = [];
+              isLoading = false;
+            });
+          }
+        } else {
+          // We have an authenticated user, get their profile from the users table
+          print('DEBUG: Authenticated user found: ${currentUser.id}');
+          
+          final userData = await _supabase
+              .from('users')
               .select()
-              .eq('user_id', userData['user_id'])
-              .order('post_date', ascending: false);
+              .eq('user_id', currentUser.id)
+              .single();
+              
+          print('DEBUG: Fetched user data: $userData');
           
-          print('DEBUG: User posts: ${posts.length}');
+          if (userData == null) {
+            throw Exception('No user data found for authenticated user');
+          }
           
-          setState(() {
-            profileData = mockProfile;
-            userPosts = List<Map<String, dynamic>>.from(posts ?? []);
-            isLoading = false;
-          });
-        } catch (postsError) {
-          print('DEBUG: Error fetching posts: $postsError');
-          setState(() {
-            profileData = mockProfile;
-            userPosts = [];
-            isLoading = false;
-          });
+          // Create profile with the user data
+          final userProfile = {
+            ...userData as Map<String, dynamic>,
+            'post_count': 0,
+            'followers': 0,
+            'following': 0,
+          };
+          
+          // Fetch this user's posts
+          try {
+            final posts = await _supabase
+                .from('posts')
+                .select()
+                .eq('user_id', currentUser.id)
+                .order('post_date', ascending: false);
+            
+            print('DEBUG: User posts: ${posts.length}');
+            
+            setState(() {
+              profileData = userProfile;
+              userPosts = List<Map<String, dynamic>>.from(posts ?? []);
+              isLoading = false;
+            });
+          } catch (postsError) {
+            print('DEBUG: Error fetching posts: $postsError');
+            setState(() {
+              profileData = userProfile;
+              userPosts = [];
+              isLoading = false;
+            });
+          }
         }
       } catch (e) {
         print('DEBUG: Supabase fetch error: $e');
         
-        // Fallback to hardcoded mock data
+        // Try to get username from shared preferences as fallback
+        final prefs = await SharedPreferences.getInstance();
+        final savedUsername = prefs.getString('username') ?? 'user';
+        
+        // Fallback with saved username
         final mockData = {
-          'username': 'demo_user',
-          'full_name': 'Demo User',
-          'bio_title': 'Flutter Developer',
+          'username': savedUsername,
+          'full_name': savedUsername,
+          'bio_title': '',
           'post_count': 0,
           'followers': 0,
           'following': 0,
@@ -94,11 +149,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       print('DEBUG: Unexpected error: $e');
       
-      // Final fallback
+      // Try to get username from shared preferences as final fallback
+      final prefs = await SharedPreferences.getInstance();
+      final savedUsername = prefs.getString('username') ?? 'user';
+      
+      // Final fallback with saved username
       setState(() {
         profileData = {
-          'username': 'error_user',
-          'full_name': 'Error occurred',
+          'username': savedUsername,
+          'full_name': savedUsername,
           'post_count': 0,
           'followers': 0,
           'following': 0,
@@ -166,45 +225,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Text('Load User Data'),
                       ),
                       
-                    // Top Row
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    // Top Row - App Bar with username
+                    AppBar(
+                      backgroundColor: Colors.white,
+                      elevation: 0,
+                      centerTitle: true,
+                      title: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Spacer(),
-                          Row(
-                            children: [
-                              Text(
-                                profileData != null && profileData!['username'] != null
-                                    ? profileData!['username'].toString()
-                                    : profileData != null && profileData!['email'] != null
-                                        ? profileData!['email'].toString().split('@').first
-                                        : 'No Username',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(width: 5),
-                              // Only show verified icon for artists
-                              if (profileData != null && 
-                                  profileData!['category'] != null && 
-                                  profileData!['category'].toString().toLowerCase() == 'artist')
-                                Image.asset(
-                                  'graphics/Verified Icon.png', 
-                                  width: 16, 
-                                  height: 16,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Icon(Icons.verified, size: 16, color: Colors.blue);
-                                  },
-                                ),
-                            ],
+                          Text(
+                            profileData != null && profileData!['username'] != null
+                                ? profileData!['username'].toString()
+                                : profileData != null && profileData!['email'] != null
+                                    ? profileData!['email'].toString().split('@').first
+                                    : 'No Username',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: Colors.black,
+                            ),
                           ),
-                          const Spacer(),
-                          const Icon(Icons.menu),
+                          const SizedBox(width: 5),
+                          // Only show verified icon for artists
+                          if (profileData != null && 
+                              profileData!['category'] != null && 
+                              profileData!['category'].toString().toLowerCase() == 'artist')
+                            Image.asset(
+                              'graphics/Verified Icon.png', 
+                              width: 18, 
+                              height: 18,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(Icons.verified, size: 18, color: Colors.blue);
+                              },
+                            ),
                         ],
                       ),
+                      actions: const [
+                        Padding(
+                          padding: EdgeInsets.only(right: 16.0),
+                          child: Icon(Icons.menu, color: Colors.black),
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 10),
