@@ -34,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController passwordController = TextEditingController();
 
   bool isLoading = false;
+  bool _passwordVisible = false; // Track password visibility
 
   void _handleLogin() async {
     final username = usernameController.text.trim();
@@ -295,13 +296,25 @@ class _LoginScreenState extends State<LoginScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: TextField(
         controller: controller,
-        obscureText: isPassword,
+        obscureText: isPassword ? !_passwordVisible : false,
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(color: Colors.white70, fontSize: 15),
           border: InputBorder.none,
-          suffixIcon: isPassword ? const Icon(Icons.visibility, color: Colors.white70) : null,
+          suffixIcon: isPassword 
+            ? IconButton(
+                icon: Icon(
+                  _passwordVisible ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.white70,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _passwordVisible = !_passwordVisible;
+                  });
+                },
+              ) 
+            : null,
         ),
       ),
     );

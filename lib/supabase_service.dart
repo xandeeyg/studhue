@@ -323,12 +323,15 @@ class SupabaseService {
     bool isProduct = false,
   }) async {
     try {
+
       // Fetch user profile to get required fields
       final userProfile = await supabase
           .from('users')
           .select()
           .eq('user_id', userId)
           .single();
+
+
 
       final Map<String, dynamic> postData = {
         'user_id': userId,
@@ -338,6 +341,7 @@ class SupabaseService {
         'is_product': isProduct,
         'post_date': DateTime.now().toIso8601String(),
         'created_at': DateTime.now().toIso8601String(),
+
         // Required user fields for posts
         'username': userProfile['username'] ?? '',
         'profession': userProfile['category'] ?? '',
@@ -351,6 +355,10 @@ class SupabaseService {
         'quantity': null,
         'price': null,
       };
+
+
+      };
+      
 
       final response = await supabase
           .from('posts')
@@ -475,6 +483,7 @@ class SupabaseService {
     }
   }
 
+
   static Future<List<UserProfile>> searchUsers(String query) async {
     if (query.isEmpty) {
       return [];
@@ -571,6 +580,88 @@ class SupabaseService {
     } catch (e) {
       _logger.severe('Error uploading image to Supabase Storage: $e');
       rethrow;
+
+  // Follow a user
+  static Future<bool> followUser(String targetUserId) async {
+    try {
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) {
+        _logger.warning('Cannot follow user: No user is logged in');
+        return false;
+      }
+
+      // Check if already following
+      final existingFollow = await supabase
+          .from('followers')
+          .select()
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', targetUserId)
+          .maybeSingle();
+
+      if (existingFollow != null) {
+        _logger.info('Already following this user');
+        return true; // Already following
+      }
+
+      // Create new follow relationship
+      await supabase.from('followers').insert({
+        'follower_id': currentUser.id,
+        'following_id': targetUserId,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      _logger.info('Successfully followed user: $targetUserId');
+      return true;
+    } catch (e) {
+      _logger.severe('Error following user: $e');
+      return false;
+    }
+  }
+
+  // Unfollow a user
+  static Future<bool> unfollowUser(String targetUserId) async {
+    try {
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) {
+        _logger.warning('Cannot unfollow user: No user is logged in');
+        return false;
+      }
+
+      // Delete the follow relationship
+      await supabase
+          .from('followers')
+          .delete()
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', targetUserId);
+
+      _logger.info('Successfully unfollowed user: $targetUserId');
+      return true;
+    } catch (e) {
+      _logger.severe('Error unfollowing user: $e');
+      return false;
+    }
+  }
+
+  // Check if current user is following a specific user
+  static Future<bool> isFollowing(String targetUserId) async {
+    try {
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) {
+        return false;
+      }
+
+      final existingFollow = await supabase
+          .from('followers')
+          .select()
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', targetUserId)
+          .maybeSingle();
+
+      return existingFollow != null;
+    } catch (e) {
+      _logger.severe('Error checking follow status: $e');
+      return false;
+
     }
   }
 }

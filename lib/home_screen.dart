@@ -3,6 +3,7 @@ import 'supabase_service.dart'; // Import your existing API service
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'user_profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -271,9 +272,25 @@ class HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-                CircleAvatar(
-                  backgroundImage: NetworkImage(post.iconPath),
-                  radius: 20,
+                GestureDetector(
+                  onTap: () {
+                    // Navigate to user profile screen when profile picture is clicked
+                    if (post.username != _loggedInUsername) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => UserProfileScreen(username: post.username),
+                        ),
+                      );
+                    } else {
+                      // If it's the current user, go to their own profile
+                      Navigator.pushNamed(context, "/profile");
+                    }
+                  },
+                  child: CircleAvatar(
+                    backgroundImage: NetworkImage(post.iconPath),
+                    radius: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Column(
@@ -281,11 +298,27 @@ class HomeScreenState extends State<HomeScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          post.username,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                        GestureDetector(
+                          onTap: () {
+                            // Navigate to user profile screen when username is clicked
+                            if (post.username != _loggedInUsername) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => UserProfileScreen(username: post.username),
+                                ),
+                              );
+                            } else {
+                              // If it's the current user, go to their own profile
+                              Navigator.pushNamed(context, "/profile");
+                            }
+                          },
+                          child: Text(
+                            post.username,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
                         if (post.isVerified)
@@ -482,11 +515,12 @@ class SearchBarWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 34,
+      height: 36,
       decoration: BoxDecoration(
-        color: const Color(0xffd6d6d6),
-        borderRadius: BorderRadius.circular(5),
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(18),
       ),
+
       child: Row(
         children: [
           const SizedBox(width: 8),
@@ -515,6 +549,15 @@ class SearchBarWidget extends StatelessWidget {
             ),
           const SizedBox(width: 8),
         ],
+
+      child: const TextField(
+        decoration: InputDecoration(
+          hintText: 'Search',
+          prefixIcon: Icon(Icons.search),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(vertical: 8),
+        ),
+
       ),
     );
   }

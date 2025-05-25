@@ -1,6 +1,10 @@
 import 'dart:io';
+
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
+
+
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:logging/logging.dart';
@@ -26,8 +30,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final TextEditingController _variationController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
 
+
   dynamic _selectedImageData; // File (mobile/desktop) or Uint8List (web)
   String? _selectedImageName;
+
+  File? _selectedImage;
+
   bool _isLoading = false;
 
   @override
@@ -45,7 +53,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Future<void> _pickImage(ImageSource source) async {
     try {
       final ImagePicker picker = ImagePicker();
+
       final XFile? image = await picker.pickImage(source: source);
+
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
 
       if (image != null) {
         if (kIsWeb) {
@@ -78,7 +90,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       return;
     }
 
+
     if (_selectedImageData == null) {
+
+    if (_selectedImage == null) {
+
       _showErrorSnackBar('Please select an image for your post');
       return;
     }
@@ -102,12 +118,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       _isLoading = true;
     });
 
+
     String imageUrl;
     try {
       // Upload the image to Supabase Storage and get its URL
       _logger.info('Starting image upload...');
       imageUrl = await SupabaseService.uploadPostImage(_selectedImageData, user.id);
       _logger.info('Image uploaded successfully. URL: $imageUrl');
+
+    try {
+      // In a real app, you would upload the image to storage first and get its URL
+      // For this example, we'll just use a placeholder image path
+      final String imageUrl =
+          _selectedImage != null
+              ? 'graphics/uploads/${DateTime.now().millisecondsSinceEpoch}.jpg'
+              : 'graphics/placeholder.jpg';
+
 
       // Determine post type based on whether it's a product or regular post
       final postType = _postType == PostType.product ? 'product' : 'regular';
@@ -120,6 +146,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         caption += 'Price: ${_priceController.text}\n';
         caption += 'Quantity: ${_quantityController.text}';
       }
+
 
       // Fetch user profile data
       final userProfile = await SupabaseService.getUserProfile();
@@ -158,6 +185,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         .insert(postData);
 
 
+      await SupabaseService.createPost(
+        userId: user.id,
+        caption: caption,
+        postType: postType,
+        imageUrl: imageUrl,
+        isProduct: _postType == PostType.product,
+      );
+
+
       _logger.info('Post created successfully');
 
       if (!mounted) return;
@@ -166,7 +202,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         const SnackBar(content: Text('Post created successfully!')),
       );
 
+
       Navigator.of(context).pop(true); // Signal HomeScreen to refresh
+
+      Navigator.of(context).pop(true); // Return success to previous screen
+
     } catch (e) {
       _logger.severe('Error creating post: $e');
       if (context.mounted) {
@@ -253,6 +293,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             const SizedBox(height: 24),
 
             // Image Picker
+
             // Image Picker Buttons (Gallery and Camera)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -298,6 +339,43 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   : kIsWeb
                       ? Image.memory(_selectedImageData as Uint8List, fit: BoxFit.cover)
                       : Image.file(_selectedImageData as File, fit: BoxFit.cover),
+
+            GestureDetector(
+              onTap: _pickImage,
+              child: Container(
+                height: 200,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                  image:
+                      _selectedImage != null
+                          ? DecorationImage(
+                            image: FileImage(_selectedImage!),
+                            fit: BoxFit.cover,
+                          )
+                          : null,
+                ),
+                child:
+                    _selectedImage == null
+                        ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(
+                              Icons.add_photo_alternate,
+                              size: 50,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Tap to add image',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ],
+                        )
+                        : null,
+              ),
+
             ),
 
             const SizedBox(height: 16),
