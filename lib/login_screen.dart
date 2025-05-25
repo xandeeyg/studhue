@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'supabase_service.dart';
+import 'package:logging/logging.dart';
+
+final _logger = Logger('LoginScreen');
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,32 +34,42 @@ class _LoginScreenState extends State<LoginScreen> {
       final userData = await _getUserByUsername(username);
       
       if (userData == null) {
-        _showDialog('User not found. Please check your username.');
-        setState(() => isLoading = false);
+        if (mounted) {
+          _showDialog('User not found. Please check your username.');
+          setState(() => isLoading = false);
+        }
         return;
       }
       
       // Check if the password matches
       if (userData['password'] != password) {
-        _showDialog('Invalid password. Please try again.');
-        setState(() => isLoading = false);
+        if (mounted) {
+          _showDialog('Invalid password. Please try again.');
+          setState(() => isLoading = false);
+        }
         return;
       }
       
       // Password matches, proceed with login
-      print('Login successful with username: $username');
+      _logger.info('Login successful with username: $username');
       
       // Save user info to shared preferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_id', userData['user_id']);
       await prefs.setString('username', username);
       
-      _showDialog('Login successful!').then((_) {
-        Navigator.pushNamed(context, '/home');
-      });
+      if (mounted) {
+        _showDialog('Login successful!').then((_) {
+          if (mounted) {
+            Navigator.pushNamed(context, '/home');
+          }
+        });
+      }
     } catch (e) {
-      print('Login error: $e');
-      _showDialog('Login failed: ${e.toString()}');
+      _logger.severe('Login error: $e');
+      if (mounted) {
+        _showDialog('Login failed: ${e.toString()}');
+      }
     } finally {
       setState(() => isLoading = false);
     }
@@ -71,26 +84,36 @@ class _LoginScreenState extends State<LoginScreen> {
           .eq('username', username)
           .maybeSingle();
       
-      print('User lookup response: $response');
+      _logger.info('User lookup response: $response');
       return response;
     } catch (e) {
-      print('Error fetching user by username: $e');
+      _logger.severe('Error fetching user by username: $e');
       return null;
     }
   }
 
-  Future<void> _showDialog(String message) {
+  Future<void> _showDialog(String message) async {
+    if (!mounted) return;
+    
     return showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+      barrierDismissible: false, // Prevent dismiss by tapping outside
+      builder: (_) {
+        if (!mounted) return const SizedBox(); // Return empty widget if not mounted
+        return AlertDialog(
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                if (mounted) {
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -223,7 +246,9 @@ class _LoginScreenState extends State<LoginScreen> {
             child: IconButton(
               icon: Image.asset('graphics/back_button.png', width: 29, height: 29),
               onPressed: () {
-                Navigator.pushNamed(context, '/login');
+                if (mounted) {
+                  Navigator.pushNamed(context, '/login');
+                }
               },
             ),
           ),

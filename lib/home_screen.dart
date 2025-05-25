@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'api_service.dart'; // Import your existing API service
+import 'supabase_service.dart'; // Import your existing API service
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
@@ -13,11 +14,28 @@ class HomeScreen extends StatefulWidget {
 class HomeScreenState extends State<HomeScreen> {
   bool _isSearchBarVisible = false;
   late Future<List<Post>> _postsFuture;
+  String? _loggedInUsername;
 
   @override
   void initState() {
     super.initState();
-    _postsFuture = ApiService.fetchPosts();
+    _loadUsernameAndPosts();
+  }
+
+  Future<void> _loadUsernameAndPosts() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _loggedInUsername = prefs.getString('username');
+      _postsFuture = SupabaseService.getPosts();
+    });
+  }
+
+  Future<void> _deletePost(String postId) async {
+    await SupabaseService.deletePost(postId);
+    // Refresh posts after deletion
+    setState(() {
+      _postsFuture = SupabaseService.getPosts();
+    });
   }
 
   void _toggleSearchBar() {
@@ -110,7 +128,9 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.add_box_outlined),
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.pushNamed(context, "/createpost");
+                    },
                   ),
                   IconButton(
                     icon: const Icon(LucideIcons.vault),
@@ -133,7 +153,25 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+<<<<<<< HEAD
   Widget _buildPost(Post post) {
+=======
+  Widget _buildPost({
+    required String id,
+    required String username,
+    required String profession,
+    required bool isVerified,
+    required double verifiedOffset,
+    required String postImagePath,
+    required String iconPath,
+    required bool isOwner,
+    bool isProduct = false,
+    String? productname,
+    String? variation,
+    int? quantity,
+    double? price,
+  }) {
+>>>>>>> origin/master
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -185,10 +223,38 @@ class HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const Spacer(),
-                const Icon(Icons.more_vert),
+                if (isOwner)
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Delete Post'),
+                          content: const Text('Are you sure you want to delete this post?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(true),
+                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        await _deletePost(id);
+                      }
+                    },
+                  )
+                else
+                  const Icon(Icons.more_vert),
               ],
             ),
           ),
+<<<<<<< HEAD
           // Post image
           if (post.imageUrl != null)
             Image.asset(
@@ -198,6 +264,39 @@ class HomeScreenState extends State<HomeScreen> {
               fit: BoxFit.cover,
             ),
           // Post actions
+=======
+          Image.asset(
+            postImagePath,
+            height: 393,
+            width: double.infinity,
+            fit: BoxFit.cover,
+          ),
+          if (isProduct)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.shopping_cart),
+                label: const Text('Add to ArtVault'),
+                onPressed: () async {
+                  if (_loggedInUsername == null) return;
+                  await SupabaseService.addToVault(
+                    username: _loggedInUsername!,
+                    productname: productname ?? '',
+                    variation: variation ?? '',
+                    quantity: quantity ?? 1,
+                    price: price ?? 0.0,
+                    iconUrl: iconPath,
+                    imageUrl: postImagePath,
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Added to ArtVault!')),
+                    );
+                  }
+                },
+              ),
+            ),
+>>>>>>> origin/master
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(

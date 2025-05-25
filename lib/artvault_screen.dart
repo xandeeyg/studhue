@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'api_service.dart'; // must define VaultItem and fetchVaultItems()
+import 'supabase_service.dart'; // must define VaultItem and fetchVaultItems()
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
@@ -18,7 +18,7 @@ class ArtVaultState extends State<ArtVault> {
   @override
   void initState() {
     super.initState();
-    _vaultItemsFuture = ApiService.fetchVaultItems();
+    _vaultItemsFuture = SupabaseService.fetchVaultItems();
   }
 
   void _onQuantityChanged(int index, int newQuantity) {
@@ -104,7 +104,9 @@ class ArtVaultState extends State<ArtVault> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.add_box_outlined),
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.pushNamed(context, "/createpost");
+                    },
                   ),
                   IconButton(
                     icon: const Icon(LucideIcons.vault),

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter/cupertino.dart';
-import 'api_service.dart';
+import 'supabase_service.dart';
+import 'pinboards_create_dialog.dart';
 
 class PinboardsScreen extends StatefulWidget {
   const PinboardsScreen({super.key});
@@ -11,7 +12,8 @@ class PinboardsScreen extends StatefulWidget {
 }
 
 class _PinboardsScreenState extends State<PinboardsScreen> {
-  final ApiService _apiService = ApiService();
+  // ... existing code ...
+
   late Future<List<Map<String, String>>> _pinboardsFuture;
 
   @override
@@ -19,7 +21,7 @@ class _PinboardsScreenState extends State<PinboardsScreen> {
     super.initState();
     // Replace with actual token logic
     const dummyToken = 'your_jwt_token_here';
-    _pinboardsFuture = _apiService.fetchPinboards(dummyToken);
+    _pinboardsFuture = SupabaseService.getPinboards(dummyToken);
   }
 
   @override
@@ -81,7 +83,19 @@ class _PinboardsScreenState extends State<PinboardsScreen> {
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.add, color: Colors.white),
-                      onPressed: () {},
+                      onPressed: () async {
+                        final result = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => const CreatePinboardDialog(),
+                        );
+                        if (result == true) {
+                          setState(() {
+                            // Replace with actual token logic if needed
+                            const dummyToken = 'your_jwt_token_here';
+                            _pinboardsFuture = SupabaseService.getPinboards(dummyToken);
+                          });
+                        }
+                      },
                     ),
                   ),
                 ],
