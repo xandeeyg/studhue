@@ -9,6 +9,7 @@ import 'artvault_screen.dart';
 import 'notifications_screen.dart';
 import 'pinboards.dart';
 import 'profile.dart';
+import 'user_profile_screen.dart';
 import 'supabase_service.dart';
 import 'package:logging/logging.dart';
 import 'createpost_screen.dart';
@@ -52,6 +53,8 @@ class MyApp extends StatelessWidget {
         '/notifications': (context) => const NotificationScreen(),
         '/createpost': (context) => const CreatePostScreen(),
       },
+      // We don't add user_profile to routes because it needs a username parameter
+      // It will be accessed using Navigator.push instead
     );
   }
 }

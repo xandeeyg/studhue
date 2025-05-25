@@ -3,6 +3,7 @@ import 'supabase_service.dart'; // Import your existing API service
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'user_profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -190,18 +191,50 @@ class HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
             child: Row(
               children: [
-                Image.asset(iconPath, width: 43, height: 43),
+                GestureDetector(
+                  onTap: () {
+                    // Navigate to user profile screen when profile picture is clicked
+                    if (username != _loggedInUsername) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => UserProfileScreen(username: username),
+                        ),
+                      );
+                    } else {
+                      // If it's the current user, go to their own profile
+                      Navigator.pushNamed(context, "/profile");
+                    }
+                  },
+                  child: Image.asset(iconPath, width: 43, height: 43),
+                ),
                 const SizedBox(width: 10),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Text(
-                          username,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                        GestureDetector(
+                          onTap: () {
+                            // Navigate to user profile screen when username is clicked
+                            if (username != _loggedInUsername) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => UserProfileScreen(username: username),
+                                ),
+                              );
+                            } else {
+                              // If it's the current user, go to their own profile
+                              Navigator.pushNamed(context, "/profile");
+                            }
+                          },
+                          child: Text(
+                            username,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                         if (isVerified) ...[

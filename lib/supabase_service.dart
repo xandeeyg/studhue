@@ -416,4 +416,87 @@ class SupabaseService {
       return null;
     }
   }
+
+  // Follow a user
+  static Future<bool> followUser(String targetUserId) async {
+    try {
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) {
+        _logger.warning('Cannot follow user: No user is logged in');
+        return false;
+      }
+
+      // Check if already following
+      final existingFollow = await supabase
+          .from('followers')
+          .select()
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', targetUserId)
+          .maybeSingle();
+
+      if (existingFollow != null) {
+        _logger.info('Already following this user');
+        return true; // Already following
+      }
+
+      // Create new follow relationship
+      await supabase.from('followers').insert({
+        'follower_id': currentUser.id,
+        'following_id': targetUserId,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      _logger.info('Successfully followed user: $targetUserId');
+      return true;
+    } catch (e) {
+      _logger.severe('Error following user: $e');
+      return false;
+    }
+  }
+
+  // Unfollow a user
+  static Future<bool> unfollowUser(String targetUserId) async {
+    try {
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) {
+        _logger.warning('Cannot unfollow user: No user is logged in');
+        return false;
+      }
+
+      // Delete the follow relationship
+      await supabase
+          .from('followers')
+          .delete()
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', targetUserId);
+
+      _logger.info('Successfully unfollowed user: $targetUserId');
+      return true;
+    } catch (e) {
+      _logger.severe('Error unfollowing user: $e');
+      return false;
+    }
+  }
+
+  // Check if current user is following a specific user
+  static Future<bool> isFollowing(String targetUserId) async {
+    try {
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) {
+        return false;
+      }
+
+      final existingFollow = await supabase
+          .from('followers')
+          .select()
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', targetUserId)
+          .maybeSingle();
+
+      return existingFollow != null;
+    } catch (e) {
+      _logger.severe('Error checking follow status: $e');
+      return false;
+    }
+  }
 }
