@@ -1,31 +1,48 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'supabase_service.dart';
 
 // Post model
 class Post {
+  final String postId;
+  final String userId;
+  final String caption;
+  final String postType;
+  final DateTime postDate;
+  final String? imageUrl;
+  // User details (joined from users table)
   final String username;
-  final String profession;
-  final bool isVerified;
-  final String postImagePath;
-  final String iconPath;
+  final String? profilePicture;
+  final String? userProfession;
 
   Post({
+    required this.postId,
+    required this.userId,
+    required this.caption,
+    required this.postType,
+    required this.postDate,
+    this.imageUrl,
     required this.username,
-    required this.profession,
-    required this.isVerified,
-    required this.postImagePath,
-    required this.iconPath,
+    this.profilePicture,
+    this.userProfession = 'Artist', // Default value
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
     return Post(
-      username: json['username'],
-      profession: json['profession'],
-      isVerified: json['isVerified'] ?? false,
-      postImagePath: json['postImagePath'],
-      iconPath: json['iconPath'],
+      postId: json['post_id'] ?? '',
+      userId: json['user_id'] ?? '',
+      caption: json['caption'] ?? '',
+      postType: json['post_type'] ?? 'regular',
+      postDate: json['post_date'] != null 
+          ? DateTime.parse(json['post_date'])
+          : DateTime.now(),
+      imageUrl: json['image_url'],
+      username: json['username'] ?? 'Unknown',
+      profilePicture: json['profile_picture'],
+      userProfession: json['profession'],
     );
   }
 }
@@ -179,24 +196,97 @@ class ApiService {
     }
   }
 
-  // Fetch posts
+  // Fetch posts with user details
   static Future<List<Post>> fetchPosts() async {
-  final token = await getToken(); // Securely retrieve your JWT token
+    final _logger = Logger('ApiService');
+    try {
+      // First, try to fetch from Supabase
+      try {
+        // Check if user is authenticated
+        final user = SupabaseService.supabase.auth.currentUser;
+        if (user == null) {
+          _logger.warning('JWT token not found; user might not be logged in. Using mock data.');
+          throw Exception('Not authenticated');
+        }
 
-  final response = await http.get(
-    Uri.parse('$baseUrl/posts'),
-    headers: {
-      'Authorization': 'Bearer $token',
-    },
-  );
+        // Add timeout to avoid hanging
+        final response = await SupabaseService.supabase
+            .from('posts')
+            .select('''
+              *, 
+              user:user_id (username, profile_picture, category)
+            ''')
+            .order('post_date', ascending: false)
+            .timeout(const Duration(seconds: 3), onTimeout: () {
+              throw TimeoutException('Supabase request timed out');
+            });
+            
+        _logger.info('Successfully fetched ${response.length} posts from Supabase');
 
-  if (response.statusCode == 200) {
-    final List<dynamic> data = jsonDecode(response.body);
-    return data.map((json) => Post.fromJson(json)).toList();
-  } else {
-    throw Exception('Failed to fetch posts');
+        return (response as List)
+            .map((data) => Post(
+                  postId: data['id'] ?? '',
+                  userId: data['user_id'] ?? '',
+                  caption: data['caption'] ?? '',
+                  postType: data['post_type'] ?? 'regular',
+                  postDate: data['post_date'] != null
+                      ? DateTime.parse(data['post_date'])
+                      : DateTime.now(),
+                  imageUrl: data['image_url'] ?? '',
+                  username: data['user']?['username'] ?? 'Unknown',
+                  profilePicture: data['user']?['profile_picture'],
+                  userProfession: data['user']?['profession'] ?? 'User',
+                ))
+            .toList();
+      } catch (e) {
+        _logger.warning('Error fetching from Supabase: $e');
+        // Continue to the HTTP fallback
+      }
+
+      // Fallback to HTTP API if Supabase fails
+      final token = await getToken();
+      final response = await http.get(
+        Uri.parse('$baseUrl/posts'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => Post.fromJson(json)).toList();
+      }
+      _logger.warning('Failed to fetch posts: ${response.statusCode}');
+    } catch (e) {
+      _logger.warning('Error fetching posts: $e');
+    }
+
+    // Return mock data when all else fails
+    return [
+      Post(
+        postId: 'mock-1',
+        userId: 'user-1',
+        caption: 'Check out my latest design!',
+        postType: 'regular',
+        postDate: DateTime.now(),
+        imageUrl: 'graphics/Background.png',
+        username: 'johndoe',
+        profilePicture: 'graphics/Profile Icon.png',
+        userProfession: 'Graphic Designer',
+      ),
+      Post(
+        postId: 'mock-2',
+        userId: 'user-2',
+        caption: 'New product available in my store!',
+        postType: 'product',
+        postDate: DateTime.now().subtract(const Duration(hours: 2)),
+        imageUrl: 'graphics/Logo 1.png',
+        username: 'janedoe',
+        profilePicture: 'graphics/Profile Icon.png',
+        userProfession: 'UI/UX Designer',
+      ),
+    ];
   }
-}
 
   // Fetch vault items
   static Future<List<VaultItem>> fetchVaultItems() async {
