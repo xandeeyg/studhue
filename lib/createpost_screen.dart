@@ -3,8 +3,6 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:logging/logging.dart';
@@ -30,7 +28,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final TextEditingController _variationController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
 
-
   dynamic _selectedImageData; // File (mobile/desktop) or Uint8List (web)
   String? _selectedImageName;
 
@@ -40,9 +37,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   void _showErrorSnackBar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -119,7 +116,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     try {
       // Upload the image to Supabase Storage and get its URL
       _logger.info('Starting image upload...');
-      final imageUrl = await SupabaseService.uploadPostImage(_selectedImageData, user.id);
+      final imageUrl = await SupabaseService.uploadPostImage(
+        _selectedImageData,
+        user.id,
+      );
       _logger.info('Image uploaded successfully. URL: $imageUrl');
 
       // Determine post type based on whether it's a product or regular post
@@ -137,7 +137,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       final userProfile = await SupabaseService.getUserProfile();
       if (userProfile == null) {
         _showErrorSnackBar('Could not fetch user profile');
-        setState(() { _isLoading = false; });
+        setState(() {
+          _isLoading = false;
+        });
         return;
       }
 
@@ -158,16 +160,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         'post_image_path': imageUrl,
         'icon_path': userProfile['icon_path'] ?? 'graphics/Profile Icon.png',
         // Optional product fields
-        'productname': _postType == PostType.product ? _titleController.text : null,
-        'variation': _postType == PostType.product ? _variationController.text : null,
-        'quantity': _postType == PostType.product ? int.tryParse(_quantityController.text) : null,
-        'price': _postType == PostType.product ? double.tryParse(_priceController.text) : null,
+        'productname':
+            _postType == PostType.product ? _titleController.text : null,
+        'variation':
+            _postType == PostType.product ? _variationController.text : null,
+        'quantity':
+            _postType == PostType.product
+                ? int.tryParse(_quantityController.text)
+                : null,
+        'price':
+            _postType == PostType.product
+                ? double.tryParse(_priceController.text)
+                : null,
       };
 
       // Insert post with all fields
-      await SupabaseService.supabase
-        .from('posts')
-        .insert(postData);
+      await SupabaseService.supabase.from('posts').insert(postData);
 
       await SupabaseService.createPost(
         userId: user.id,
@@ -201,7 +209,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   // Only one _showErrorSnackBar should exist, keep the one at the top of the class.
-
 
   @override
   Widget build(BuildContext context) {
@@ -295,25 +302,32 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 color: Colors.grey[200],
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: _selectedImageData == null
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(
-                          Icons.add_photo_alternate,
-                          size: 50,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'No image selected',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    )
-                  : kIsWeb
-                      ? Image.memory(_selectedImageData as Uint8List, fit: BoxFit.cover)
-                      : Image.file(_selectedImageData as File, fit: BoxFit.cover),
+              child:
+                  _selectedImageData == null
+                      ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(
+                            Icons.add_photo_alternate,
+                            size: 50,
+                            color: Colors.grey,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'No image selected',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      )
+                      : kIsWeb
+                      ? Image.memory(
+                        _selectedImageData as Uint8List,
+                        fit: BoxFit.cover,
+                      )
+                      : Image.file(
+                        _selectedImageData as File,
+                        fit: BoxFit.cover,
+                      ),
             ),
 
             const SizedBox(height: 16),
