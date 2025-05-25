@@ -1,6 +1,82 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logging/logging.dart';
 
+class VaultItem {
+  final String username;
+  final String productname;
+  final String variation;
+  final int quantity;
+  final double price;
+  final String iconUrl;
+  final String imageUrl;
+
+  VaultItem({
+    required this.username,
+    required this.productname,
+    required this.variation,
+    required this.quantity,
+    required this.price,
+    required this.iconUrl,
+    required this.imageUrl,
+  });
+
+  factory VaultItem.fromJson(Map<String, dynamic> json) {
+    return VaultItem(
+      username: json['username'] as String,
+      productname: json['productname'] as String,
+      variation: json['variation'] as String,
+      quantity: json['quantity'] as int,
+      price: (json['price'] as num).toDouble(),
+      iconUrl: json['icon_url'] as String,
+      imageUrl: json['image_url'] as String,
+    );
+  }
+}
+
+class Post {
+  final String id;
+  final String username;
+  final String profession;
+  final bool isVerified;
+  final String postImagePath;
+  final String iconPath;
+  final bool isProduct;
+  final String? productname;
+  final String? variation;
+  final int? quantity;
+  final double? price;
+
+  Post({
+    required this.id,
+    required this.username,
+    required this.profession,
+    required this.isVerified,
+    required this.postImagePath,
+    required this.iconPath,
+    required this.isProduct,
+    this.productname,
+    this.variation,
+    this.quantity,
+    this.price,
+  });
+
+  factory Post.fromJson(Map<String, dynamic> json) {
+    return Post(
+      id: json['id'] as String,
+      username: json['username'] as String,
+      profession: json['profession'] as String,
+      isVerified: json['is_verified'] as bool,
+      postImagePath: json['post_image_path'] as String,
+      iconPath: json['icon_path'] as String,
+      isProduct: json['is_product'] as bool? ?? false,
+      productname: json['productname'] as String?,
+      variation: json['variation'] as String?,
+      quantity: json['quantity'] as int?,
+      price: (json['price'] as num?)?.toDouble(),
+    );
+  }
+}
+
 class SupabaseService {
   static final _logger = Logger('SupabaseService');
   
@@ -159,16 +235,170 @@ class SupabaseService {
     }
     
     try {
-      final response = await supabase
-          .from('users')  // Using lowercase table name
+      final data = await supabase
+          .from('users')
           .select()
-          .eq('user_id', user.id)  // Using lowercase column name
+          .eq('id', user.id)
           .single();
-      
-      return response;
+      return data;
     } catch (e) {
       _logger.severe('Error fetching user profile: $e');
       return null;
+    }
+  }
+
+  // Create a new pinboard
+  static Future<void> createPinboard({
+    required String name,
+    required String details,
+    required String coverImg,
+  }) async {
+    try {
+      await supabase
+          .from('pinboards')
+          .insert({
+            'name': name,
+            'description': details,
+            'coverImg': coverImg,
+          });
+      _logger.info('Pinboard created: $name');
+    } catch (e) {
+      _logger.severe('Error creating pinboard: $e');
+      rethrow;
+    }
+  }
+
+  // Create a new post
+  static Future<String> createPost({
+    required String username,
+    required String profession,
+    required bool isVerified,
+    required String postImagePath,
+    required String iconPath,
+    required bool isProduct,
+    String? productname,
+    String? variation,
+    int? quantity,
+    double? price,
+  }) async {
+    try {
+      final response = await supabase
+          .from('posts')
+          .insert({
+            'username': username,
+            'profession': profession,
+            'is_verified': isVerified,
+            'post_image_path': postImagePath,
+            'icon_path': iconPath,
+            'is_product': isProduct,
+            'productname': productname,
+            'variation': variation,
+            'quantity': quantity,
+            'price': price,
+            'created_at': DateTime.now().toIso8601String(),
+          })
+          .select('id')
+          .single();
+      
+      final String postId = response['id'] as String;
+      _logger.info('Post created with ID: $postId');
+      return postId;
+    } catch (e) {
+      _logger.severe('Error creating post: $e');
+      rethrow;
+    }
+  }
+
+  // Add product post to vault
+  static Future<void> addToVault({
+    required String username,
+    required String productname,
+    required String variation,
+    required int quantity,
+    required double price,
+    required String iconUrl,
+    required String imageUrl,
+  }) async {
+    try {
+      await supabase
+          .from('vault_items')
+          .insert({
+            'username': username,
+            'productname': productname,
+            'variation': variation,
+            'quantity': quantity,
+            'price': price,
+            'icon_url': iconUrl,
+            'image_url': imageUrl,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+      _logger.info('Added to vault: $productname');
+    } catch (e) {
+      _logger.severe('Error adding to vault: $e');
+      rethrow;
+    }
+  }
+
+  // Delete post
+  static Future<void> deletePost(String postId) async {
+    try {
+      await supabase
+          .from('posts')
+          .delete()
+          .eq('id', postId);
+      _logger.info('Post deleted: $postId');
+    } catch (e) {
+      _logger.severe('Error deleting post: $e');
+      rethrow;
+    }
+  }
+
+  // Get posts
+  static Future<List<Post>> getPosts() async {
+    try {
+      final response = await supabase
+          .from('posts')
+          .select()
+          .order('created_at', ascending: false);
+
+      return response.map((post) => Post.fromJson(post)).toList();
+    } catch (e) {
+      _logger.severe('Error fetching posts: $e');
+      return [];
+    }
+  }
+
+  // Get pinboards
+  static Future<List<Map<String, String>>> getPinboards(String token) async {
+    try {
+      final pinboards = await supabase
+          .from('pinboards')
+          .select()
+          .order('created_at', ascending: false);
+
+      // Convert dynamic values to String
+      return pinboards.map((pinboard) => {
+        'name': pinboard['name']?.toString() ?? '',
+        'coverImg': pinboard['coverImg']?.toString() ?? '',
+      }).toList();
+    } catch (e) {
+      _logger.severe('Error fetching pinboards: $e');
+      return [];
+    }
+  }
+
+  // Fetch vault items
+  static Future<List<VaultItem>> fetchVaultItems() async {
+    try {
+      final response = await supabase
+          .from('vault_items')
+          .select()
+          .order('created_at', ascending: false);
+
+      return response.map((item) => VaultItem.fromJson(item)).toList();
+    } catch (e) {
+      _logger.severe('Error fetching vault items: $e');
+      return [];
     }
   }
 

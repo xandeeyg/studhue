@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
-import 'api_service.dart';
+import 'supabase_service.dart';
 import 'package:flutter/cupertino.dart'; 
 
 class ProfileScreen extends StatefulWidget {
@@ -15,7 +15,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool isLoading = true;
 
   Future<void> loadProfile() async {
-    final data = await ApiService.fetchProfileData();
+    final data = await SupabaseService.getUserProfile();
     setState(() {
       profileData = data;
       isLoading = false;
@@ -217,7 +217,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.add_box_outlined),
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.pushNamed(context, "/createpost");
+                    },
                   ),
                   IconButton(
                     icon: const Icon(LucideIcons.vault),
