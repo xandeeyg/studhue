@@ -64,7 +64,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         _showDialog('Signup success: ${result['message']}');
         // Navigate to login screen after successful signup
         Future.delayed(Duration(seconds: 2), () {
-          Navigator.pushNamed(context, "/login");
+          Navigator.pushNamedAndRemoveUntil(context, "/login", (route) => false);
         });
       } else {
         _showDialog('Signup failed: ${result['message']}');

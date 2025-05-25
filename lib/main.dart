@@ -38,7 +38,7 @@ class MyApp extends StatelessWidget {
       title: 'StudHue',
       theme: ThemeData(primarySwatch: Colors.blue),
       // Set initial screen
-      initialRoute: '/',
+      initialRoute: '/welcome',
       routes: {
         '/': (context) => const SplashScreen(),
         '/welcome': (context) => const WelcomeScreen(),

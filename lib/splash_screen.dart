@@ -1,21 +1,5 @@
 import 'package:flutter/material.dart';
-
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'My App',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: const SplashScreen(),
-    );
-  }
-}
+import 'supabase_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -27,13 +11,24 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
-  super.initState();
+    super.initState();
+    _checkAuthStatusAndNavigate();
+  }
 
-  Future.delayed(const Duration(seconds: 2), () {
-    if (mounted) {
+  Future<void> _checkAuthStatusAndNavigate() async {
+    // Wait for a short period to allow Supabase to initialize and restore session
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+
+    final currentUser = SupabaseService.supabase.auth.currentUser;
+    if (currentUser != null) {
+      // User is logged in, navigate to home screen
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      // User is not logged in, navigate to welcome screen
       Navigator.pushReplacementNamed(context, '/welcome');
     }
-  });
   }
 
   @override

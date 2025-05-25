@@ -7,7 +7,7 @@ import 'supabase_service.dart';
 
 // Post model
 class Post {
-  final String postId;
+  final String id;
   final String userId;
   final String caption;
   final String postType;
@@ -19,7 +19,7 @@ class Post {
   final String? userProfession;
 
   Post({
-    required this.postId,
+    required this.id,
     required this.userId,
     required this.caption,
     required this.postType,
@@ -32,7 +32,7 @@ class Post {
 
   factory Post.fromJson(Map<String, dynamic> json) {
     return Post(
-      postId: json['post_id'] ?? '',
+      id: json['id'] ?? '',
       userId: json['user_id'] ?? '',
       caption: json['caption'] ?? '',
       postType: json['post_type'] ?? 'regular',
@@ -224,19 +224,7 @@ class ApiService {
         _logger.info('Successfully fetched ${response.length} posts from Supabase');
 
         return (response as List)
-            .map((data) => Post(
-                  postId: data['id'] ?? '',
-                  userId: data['user_id'] ?? '',
-                  caption: data['caption'] ?? '',
-                  postType: data['post_type'] ?? 'regular',
-                  postDate: data['post_date'] != null
-                      ? DateTime.parse(data['post_date'])
-                      : DateTime.now(),
-                  imageUrl: data['image_url'] ?? '',
-                  username: data['user']?['username'] ?? 'Unknown',
-                  profilePicture: data['user']?['profile_picture'],
-                  userProfession: data['user']?['profession'] ?? 'User',
-                ))
+            .map((data) => Post.fromJson(data))
             .toList();
       } catch (e) {
         _logger.warning('Error fetching from Supabase: $e');
@@ -264,7 +252,7 @@ class ApiService {
     // Return mock data when all else fails
     return [
       Post(
-        postId: 'mock-1',
+        id: 'mock-1',
         userId: 'user-1',
         caption: 'Check out my latest design!',
         postType: 'regular',
@@ -275,7 +263,7 @@ class ApiService {
         userProfession: 'Graphic Designer',
       ),
       Post(
-        postId: 'mock-2',
+        id: 'mock-2',
         userId: 'user-2',
         caption: 'New product available in my store!',
         postType: 'product',

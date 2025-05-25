@@ -1,5 +1,7 @@
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logging/logging.dart';
+import 'dart:io'; // Required for File type
 
 class VaultItem {
   final String username;
@@ -68,19 +70,19 @@ class Post {
 
   factory Post.fromJson(Map<String, dynamic> json) {
     return Post(
-      id: json['id'] as String,
-      username: json['username'] as String,
-      profession: json['profession'] as String,
-      isVerified: json['is_verified'] as bool,
+      id: json['id']?.toString() ?? '',
+      username: json['username']?.toString() ?? '',
+      profession: json['profession']?.toString() ?? '',
+      isVerified: json['is_verified'] is bool ? json['is_verified'] : false,
       verifiedOffset: (json['verified_offset'] as num?)?.toDouble() ?? 4.0,
-      postImagePath: json['post_image_path'] as String,
-      iconPath: json['icon_path'] as String,
-      caption: json['caption'] as String? ?? '',
-      postDate: DateTime.parse(json['created_at'] as String),
-      isProduct: json['is_product'] as bool? ?? false,
-      productname: json['productname'] as String?,
-      variation: json['variation'] as String?,
-      quantity: json['quantity'] as int?,
+      postImagePath: json['post_image_path']?.toString() ?? '',
+      iconPath: json['icon_path']?.toString() ?? '',
+      caption: json['caption']?.toString() ?? '',
+      postDate: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
+      isProduct: json['is_product'] is bool ? json['is_product'] : false,
+      productname: json['productname']?.toString(),
+      variation: json['variation']?.toString(),
+      quantity: json['quantity'] is int ? json['quantity'] : null,
       price: (json['price'] as num?)?.toDouble(),
     );
   }
@@ -114,7 +116,7 @@ class UserProfile {
       fullName: json['full_name'] as String? ?? '',
       email: json['email'] as String? ?? '',
       profession: json['category'] as String? ?? 'N/A', // Using 'category' as profession, adjust if different
-      iconPath: json['icon_path'] as String? ?? 'graphics/Profile Icon.png', // Default icon, adjust if you have a field for this
+      iconPath: json['profile_picture'] ?? 'graphics/Profile Icon.png', // Default icon, adjust if you have a field for this
       isVerified: json['is_verified'] as bool? ?? false, // Adjust if you have a field for this
       accountCreationDate: DateTime.parse(json['account_date_creation'] as String? ?? DateTime.now().toIso8601String()),
     );
@@ -188,7 +190,7 @@ class SupabaseService {
         'success': true,
         'message': 'Account created successfully',
         'user': {
-          'id': userId,
+          'user_id': userId,
           'email': email,
           'username': username,
         }
@@ -282,7 +284,7 @@ class SupabaseService {
       final data = await supabase
           .from('users')
           .select()
-          .eq('id', user.id)
+          .eq('user_id', user.id)
           .single();
       return data;
     } catch (e) {
@@ -293,19 +295,19 @@ class SupabaseService {
 
   // Create a new pinboard
   static Future<void> createPinboard({
-    required String name,
-    required String details,
+    required String boardName,
+    required String boardDescription,
     required String coverImg,
   }) async {
     try {
       await supabase
           .from('pinboards')
           .insert({
-            'name': name,
-            'description': details,
+            'board_name': boardName,
+            'board_description': boardDescription,
             'coverImg': coverImg,
           });
-      _logger.info('Pinboard created: $name');
+      _logger.info('Pinboard created: $boardName');
     } catch (e) {
       _logger.severe('Error creating pinboard: $e');
       rethrow;
@@ -314,36 +316,48 @@ class SupabaseService {
 
   // Create a new post
   static Future<String> createPost({
-    required String username,
-    required String profession,
-    required bool isVerified,
-    required String postImagePath,
-    required String iconPath,
-    required bool isProduct,
-    String? productname,
-    String? variation,
-    int? quantity,
-    double? price,
+    required String userId,
+    required String caption,
+    required String postType,
+    required String imageUrl,
+    bool isProduct = false,
   }) async {
     try {
+      // Fetch user profile to get required fields
+      final userProfile = await supabase
+          .from('users')
+          .select()
+          .eq('user_id', userId)
+          .single();
+
+      final Map<String, dynamic> postData = {
+        'user_id': userId,
+        'caption': caption,
+        'post_type': postType,
+        'image_url': imageUrl,
+        'is_product': isProduct,
+        'post_date': DateTime.now().toIso8601String(),
+        'created_at': DateTime.now().toIso8601String(),
+        // Required user fields for posts
+        'username': userProfile['username'] ?? '',
+        'profession': userProfile['category'] ?? '',
+        'is_verified': userProfile['is_verified'] ?? false,
+        'verified_offset': userProfile['verified_offset'] ?? 4.0,
+        'icon_path': userProfile['profile_picture'] ?? 'graphics/Profile Icon.png',
+        'post_image_path': imageUrl, // Use imageUrl as post_image_path
+        // Optional product fields
+        'productname': null,
+        'variation': null,
+        'quantity': null,
+        'price': null,
+      };
+
       final response = await supabase
           .from('posts')
-          .insert({
-            'username': username,
-            'profession': profession,
-            'is_verified': isVerified,
-            'post_image_path': postImagePath,
-            'icon_path': iconPath,
-            'is_product': isProduct,
-            'productname': productname,
-            'variation': variation,
-            'quantity': quantity,
-            'price': price,
-            'created_at': DateTime.now().toIso8601String(),
-          })
+          .insert(postData)
           .select('id')
           .single();
-      
+
       final String postId = response['id'] as String;
       _logger.info('Post created with ID: $postId');
       return postId;
@@ -384,13 +398,13 @@ class SupabaseService {
   }
 
   // Delete post
-  static Future<void> deletePost(String postId) async {
+  static Future<void> deletePost(String id) async {
     try {
       await supabase
           .from('posts')
           .delete()
-          .eq('id', postId);
-      _logger.info('Post deleted: $postId');
+          .eq('id', id);
+      _logger.info('Post deleted: $id');
     } catch (e) {
       _logger.severe('Error deleting post: $e');
       rethrow;
@@ -477,6 +491,86 @@ class SupabaseService {
     } catch (e) {
       _logger.severe('Error searching users: $e');
       return [];
+    }
+  }
+
+  static Future<String?> uploadFile(File file, String userId) async {
+    try {
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
+      final String storagePath = 'public/$userId/$fileName'; // Store in a user-specific public folder
+
+      await supabase.storage
+          .from('posts_media') // Ensure this is your bucket name
+          .upload(
+            storagePath,
+            file,
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+          );
+
+      // Get the public URL
+      final String publicUrl = supabase.storage
+          .from('posts_media')
+          .getPublicUrl(storagePath);
+      
+      _logger.info('File uploaded to: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      _logger.severe('Error uploading file: $e');
+      return null;
+    }
+  }
+
+  // Updated: Support both File (mobile/desktop) and Uint8List (web)
+  static Future<String> uploadPostImage(dynamic imageFile, String userId) async {
+    try {
+      final fileName = DateTime.now().millisecondsSinceEpoch.toString();
+      String filePath;
+      String publicUrl;
+
+      // Detect platform
+      bool isWeb = false;
+      try {
+        // kIsWeb is only available if you import foundation.dart
+        // We'll use a runtime check for web
+        isWeb = identical(0, 0.0);
+      } catch (_) {}
+
+      if (isWeb) {
+        // On web, imageFile should be a List<int> (Uint8List is a subtype)
+        filePath = '$userId/$fileName';
+        // Try to detect content type from file bytes
+        String contentType = 'image/jpeg'; // Default
+        if (imageFile is List<int> && imageFile.length > 4) {
+          // Simple PNG signature check
+          if (imageFile[0] == 0x89 && imageFile[1] == 0x50 && imageFile[2] == 0x4E && imageFile[3] == 0x47) {
+            contentType = 'image/png';
+          }
+        }
+        final storageResponse = await supabase.storage
+            .from('post-media')
+            .uploadBinary(filePath, imageFile, fileOptions: FileOptions(contentType: contentType));
+        _logger.info('Image uploaded (web) to: post-media/$filePath, response: $storageResponse');
+      } else {
+        // On mobile/desktop, imageFile should be a File
+        final fileNameWithExt = imageFile.path.split('/').last;
+        filePath = '$userId/${DateTime.now().millisecondsSinceEpoch}_$fileNameWithExt';
+        // Guess content type from extension
+        String contentType = fileNameWithExt.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+        final storageResponse = await supabase.storage
+            .from('post-media')
+            .upload(filePath, imageFile, fileOptions: FileOptions(contentType: contentType));
+        _logger.info('Image uploaded (mobile/desktop) to: post-media/$filePath, response: $storageResponse');
+      }
+
+      // Get the public URL of the uploaded file
+      publicUrl = supabase.storage
+          .from('post-media')
+          .getPublicUrl(filePath);
+      _logger.info('Public URL for image: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      _logger.severe('Error uploading image to Supabase Storage: $e');
+      rethrow;
     }
   }
 }

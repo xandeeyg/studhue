@@ -45,8 +45,8 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _deletePost(String postId) async {
-    await SupabaseService.deletePost(postId);
+  Future<void> _deletePost(String id) async {
+    await SupabaseService.deletePost(id);
     // Refresh posts after deletion
     setState(() {
       _postsFuture = SupabaseService.getPosts();
@@ -192,8 +192,13 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.add_box_outlined),
-                    onPressed: () {
-                      Navigator.pushNamed(context, "/createpost");
+                    onPressed: () async {
+                      final result = await Navigator.pushNamed(context, "/createpost");
+                      if (result == true && mounted) {
+                        setState(() {
+                          _postsFuture = SupabaseService.getPosts();
+                        });
+                      }
                     },
                   ),
                   IconButton(

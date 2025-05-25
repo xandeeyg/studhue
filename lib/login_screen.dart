@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'supabase_service.dart';
 import 'package:logging/logging.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final _logger = Logger('LoginScreen');
 
@@ -13,6 +14,22 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Check if user is already authenticated
+    
+    // Listen for auth state changes
+    SupabaseService.supabase.auth.onAuthStateChange.listen((data) {
+      final event = data.event;
+      if (event == AuthChangeEvent.signedOut || event == AuthChangeEvent.userDeleted) {
+        // Redirect to login if signed out
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+        }
+      }
+    });
+  }
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
@@ -30,48 +47,59 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => isLoading = true);
 
     try {
-      // First, get the user data associated with this username
-      final userData = await _getUserByUsername(username);
+      // 1. Get the user's email from your 'users' table using their username
+      final userRecord = await _getUserByUsername(username); // Assuming this returns the user row
       
-      if (userData == null) {
+      if (userRecord == null || userRecord['email'] == null) {
         if (mounted) {
-          _showDialog('User not found. Please check your username.');
-          setState(() => isLoading = false);
+          _showDialog('User not found or email missing for this user.');
+          // setState(() => isLoading = false); // isLoading will be set to false in finally block
         }
         return;
       }
-      
-      // Check if the password matches
-      if (userData['password'] != password) {
+
+      final String email = userRecord['email'];
+
+      // 2. Sign in with Supabase Auth using email and password
+      final AuthResponse response = await SupabaseService.supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      if (response.user != null) {
+        _logger.info('Supabase login successful for user: ${response.user!.id}');
+        
+        // Optional: Save additional user info to SharedPreferences if needed
+        // The session itself is now managed by Supabase
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_id', response.user!.id); 
+        await prefs.setString('username', username); // You can still store username for display
+
         if (mounted) {
-          _showDialog('Invalid password. Please try again.');
-          setState(() => isLoading = false);
+          // Using pushNamedAndRemoveUntil to clear the login screen from the stack
+          Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
         }
-        return;
+      } else {
+        // This case might not be reached if signInWithPassword throws an AuthException for failures
+        _logger.warning('Supabase login attempt returned no user, but no error.');
+        if (mounted) {
+          _showDialog('Login failed. Please check your credentials.');
+        }
       }
-      
-      // Password matches, proceed with login
-      _logger.info('Login successful with username: $username');
-      
-      // Save user info to shared preferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_id', userData['user_id']);
-      await prefs.setString('username', username);
-      
+    } on AuthException catch (e) {
+      _logger.severe('Supabase AuthException: ${e.message}');
       if (mounted) {
-        _showDialog('Login successful!').then((_) {
-          if (mounted) {
-            Navigator.pushNamed(context, '/home');
-          }
-        });
+        _showDialog('Login failed: ${e.message}');
       }
     } catch (e) {
-      _logger.severe('Login error: $e');
+      _logger.severe('Generic login error: $e');
       if (mounted) {
-        _showDialog('Login failed: ${e.toString()}');
+        _showDialog('Login failed: An unexpected error occurred.');
       }
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) { 
+        setState(() => isLoading = false);
+      }
     }
   }
   
