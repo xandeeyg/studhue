@@ -549,15 +549,6 @@ class SearchBarWidget extends StatelessWidget {
             ),
           const SizedBox(width: 8),
         ],
-
-      child: const TextField(
-        decoration: InputDecoration(
-          hintText: 'Search',
-          prefixIcon: Icon(Icons.search),
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(vertical: 8),
-        ),
-
       ),
     );
   }

@@ -38,6 +38,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   bool _isLoading = false;
 
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -53,12 +60,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Future<void> _pickImage(ImageSource source) async {
     try {
       final ImagePicker picker = ImagePicker();
-
       final XFile? image = await picker.pickImage(source: source);
-
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-
-
       if (image != null) {
         if (kIsWeb) {
           final bytes = await image.readAsBytes();
@@ -90,11 +92,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       return;
     }
 
-
     if (_selectedImageData == null) {
-
-    if (_selectedImage == null) {
-
       _showErrorSnackBar('Please select an image for your post');
       return;
     }
@@ -118,26 +116,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       _isLoading = true;
     });
 
-
-    String imageUrl;
     try {
       // Upload the image to Supabase Storage and get its URL
       _logger.info('Starting image upload...');
-      imageUrl = await SupabaseService.uploadPostImage(_selectedImageData, user.id);
+      final imageUrl = await SupabaseService.uploadPostImage(_selectedImageData, user.id);
       _logger.info('Image uploaded successfully. URL: $imageUrl');
-
-    try {
-      // In a real app, you would upload the image to storage first and get its URL
-      // For this example, we'll just use a placeholder image path
-      final String imageUrl =
-          _selectedImage != null
-              ? 'graphics/uploads/${DateTime.now().millisecondsSinceEpoch}.jpg'
-              : 'graphics/placeholder.jpg';
-
 
       // Determine post type based on whether it's a product or regular post
       final postType = _postType == PostType.product ? 'product' : 'regular';
-      
       // For product posts, include product details in the caption
       String caption = _descriptionController.text;
       if (_postType == PostType.product) {
@@ -146,7 +132,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         caption += 'Price: ${_priceController.text}\n';
         caption += 'Quantity: ${_quantityController.text}';
       }
-
 
       // Fetch user profile data
       final userProfile = await SupabaseService.getUserProfile();
@@ -184,7 +169,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         .from('posts')
         .insert(postData);
 
-
       await SupabaseService.createPost(
         userId: user.id,
         caption: caption,
@@ -192,7 +176,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         imageUrl: imageUrl,
         isProduct: _postType == PostType.product,
       );
-
 
       _logger.info('Post created successfully');
 
@@ -202,11 +185,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         const SnackBar(content: Text('Post created successfully!')),
       );
 
-
       Navigator.of(context).pop(true); // Signal HomeScreen to refresh
-
-      Navigator.of(context).pop(true); // Return success to previous screen
-
     } catch (e) {
       _logger.severe('Error creating post: $e');
       if (context.mounted) {
@@ -221,12 +200,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
-  void _showErrorSnackBar(String message) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
-  }
+  // Only one _showErrorSnackBar should exist, keep the one at the top of the class.
+
 
   @override
   Widget build(BuildContext context) {
@@ -339,43 +314,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   : kIsWeb
                       ? Image.memory(_selectedImageData as Uint8List, fit: BoxFit.cover)
                       : Image.file(_selectedImageData as File, fit: BoxFit.cover),
-
-            GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                height: 200,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(8),
-                  image:
-                      _selectedImage != null
-                          ? DecorationImage(
-                            image: FileImage(_selectedImage!),
-                            fit: BoxFit.cover,
-                          )
-                          : null,
-                ),
-                child:
-                    _selectedImage == null
-                        ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(
-                              Icons.add_photo_alternate,
-                              size: 50,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Tap to add image',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ],
-                        )
-                        : null,
-              ),
-
             ),
 
             const SizedBox(height: 16),

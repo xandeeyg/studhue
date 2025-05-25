@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CreatePinboardDialog extends StatefulWidget {
   const CreatePinboardDialog({super.key});
@@ -56,10 +57,22 @@ class _CreatePinboardDialogState extends State<CreatePinboardDialog> {
                   if (_formKey.currentState?.validate() != true) return;
                   setState(() => _isLoading = true);
                   try {
+                    final currentUser = Supabase.instance.client.auth.currentUser;
+                    if (currentUser == null) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Error: User not logged in.')),
+                        );
+                      }
+                      return; // Exit if no user is logged in
+                    }
+                    final userId = currentUser.id;
+
                     await SupabaseService.createPinboard(
                       boardName: _nameController.text.trim(),
                       boardDescription: _descriptionController.text.trim(),
                       coverImg: _coverImgController.text.trim(),
+                      userId: userId,
                     );
                     if (!mounted) return;
                     Navigator.of(context).pop(true);
@@ -71,7 +84,7 @@ class _CreatePinboardDialogState extends State<CreatePinboardDialog> {
                     }
                   } finally {
                     if (!mounted) return;
-setState(() => _isLoading = false);
+                    setState(() => _isLoading = false);
                   }
                 },
           child: _isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Create'),
