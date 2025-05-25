@@ -57,8 +57,8 @@ class _CreatePinboardDialogState extends State<CreatePinboardDialog> {
                   setState(() => _isLoading = true);
                   try {
                     await SupabaseService.createPinboard(
-                      name: _nameController.text.trim(),
-                      details: _descriptionController.text.trim(),
+                      boardName: _nameController.text.trim(),
+                      boardDescription: _descriptionController.text.trim(),
                       coverImg: _coverImgController.text.trim(),
                     );
                     if (!mounted) return;

@@ -258,19 +258,19 @@ class SupabaseService {
 
   // Create a new pinboard
   static Future<void> createPinboard({
-    required String name,
-    required String details,
+    required String boardName,
+    required String boardDescription,
     required String coverImg,
   }) async {
     try {
       await supabase
           .from('pinboards')
           .insert({
-            'name': name,
-            'description': details,
+            'board_name': boardName,
+            'board_description': boardDescription,
             'coverImg': coverImg,
           });
-      _logger.info('Pinboard created: $name');
+      _logger.info('Pinboard created: $boardName');
     } catch (e) {
       _logger.severe('Error creating pinboard: $e');
       rethrow;
@@ -279,33 +279,26 @@ class SupabaseService {
 
   // Create a new post
   static Future<String> createPost({
-    required String username,
-    required String profession,
-    required bool isVerified,
-    required String postImagePath,
-    required String iconPath,
-    required bool isProduct,
-    String? productname,
-    String? variation,
-    int? quantity,
-    double? price,
+    required String userId,
+    required String caption,
+    required String postType,
+    required String imageUrl,
+    bool isProduct = false,
   }) async {
     try {
+      final Map<String, dynamic> postData = {
+        'user_id': userId,
+        'caption': caption,
+        'post_type': postType,
+        'image_url': imageUrl,
+        'is_product': isProduct,
+        'post_date': DateTime.now().toIso8601String(),
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      
       final response = await supabase
           .from('posts')
-          .insert({
-            'username': username,
-            'profession': profession,
-            'is_verified': isVerified,
-            'post_image_path': postImagePath,
-            'icon_path': iconPath,
-            'is_product': isProduct,
-            'productname': productname,
-            'variation': variation,
-            'quantity': quantity,
-            'price': price,
-            'created_at': DateTime.now().toIso8601String(),
-          })
+          .insert(postData)
           .select('id')
           .single();
       
