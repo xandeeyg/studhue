@@ -88,21 +88,7 @@ class HomeScreenState extends State<HomeScreen> {
                   itemCount: posts.length,
                   itemBuilder: (context, index) {
                     final post = posts[index];
-                    return _buildPost(
-                      id: post.id,
-                      username: post.username,
-                      profession: post.profession,
-                      isVerified: post.isVerified,
-                      verifiedOffset: 128,
-                      postImagePath: post.postImagePath,
-                      iconPath: post.iconPath,
-                      isOwner: post.username == _loggedInUsername,
-                      isProduct: post.isProduct,
-                      productname: post.productname,
-                      variation: post.variation,
-                      quantity: post.quantity,
-                      price: post.price,
-                    );
+                    return _buildPost(post);
                   },
                 );
               },
@@ -167,6 +153,9 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+<<<<<<< HEAD
+  Widget _buildPost(Post post) {
+=======
   Widget _buildPost({
     required String id,
     required String username,
@@ -182,29 +171,38 @@ class HomeScreenState extends State<HomeScreen> {
     int? quantity,
     double? price,
   }) {
+>>>>>>> origin/master
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       child: Column(
         children: [
+          // Post header with user info
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
             child: Row(
               children: [
-                Image.asset(iconPath, width: 43, height: 43),
+                // User avatar
+                CircleAvatar(
+                  radius: 21.5,
+                  backgroundImage: post.profilePicture != null
+                      ? AssetImage(post.profilePicture!)
+                      : const AssetImage('graphics/Profile Icon.png'),
+                ),
                 const SizedBox(width: 10),
+                // Username and profession
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Text(
-                          username,
+                          post.username,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
                         ),
-                        if (isVerified) ...[
+                        if (post.userProfession?.toLowerCase() == 'artist') ...[
                           const SizedBox(width: 4),
                           Image.asset(
                             'graphics/Verified Icon.png',
@@ -216,9 +214,10 @@ class HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                     Text(
-                      profession,
+                      post.userProfession ?? 'User',
                       style: const TextStyle(
                         fontSize: 12,
+                        color: Colors.grey,
                       ),
                     ),
                   ],
@@ -255,6 +254,17 @@ class HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
+<<<<<<< HEAD
+          // Post image
+          if (post.imageUrl != null)
+            Image.asset(
+              post.imageUrl!,
+              height: 393,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          // Post actions
+=======
           Image.asset(
             postImagePath,
             height: 393,
@@ -286,23 +296,117 @@ class HomeScreenState extends State<HomeScreen> {
                 },
               ),
             ),
+>>>>>>> origin/master
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+            padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
-                Image.asset('graphics/Heart.png', width: 25.5, height: 22.667),
-                const SizedBox(width: 15),
-                Image.asset('graphics/Comment.png', width: 25.5, height: 22.667),
-                const SizedBox(width: 15),
-                const Icon(Icons.send_outlined, size: 24),
+                IconButton(
+                  icon: const Icon(Icons.favorite_border, size: 28),
+                  onPressed: () {},
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chat_bubble_outline, size: 26),
+                  onPressed: () {},
+                ),
+                IconButton(
+                  icon: const Icon(Icons.send_outlined, size: 26),
+                  onPressed: () {},
+                ),
+                if (post.postType == 'product')
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8.0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.blue),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'SHOP NOW',
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
                 const Spacer(),
-                const Icon(Icons.bookmark_border, size: 24),
+                IconButton(
+                  icon: const Icon(Icons.bookmark_border, size: 28),
+                  onPressed: () {},
+                ),
+              ],
+            ),
+          ),
+          // Like count and caption
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '1,234 likes',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (post.caption.isNotEmpty)
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(color: Colors.black, fontSize: 14),
+                      children: [
+                        TextSpan(
+                          text: '${post.username} ',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        TextSpan(text: post.caption),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                const Text(
+                  'View all 42 comments',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatTimeAgo(post.postDate),
+                  style: TextStyle(
+                    color: Colors.grey.shade500,
+                    fontSize: 10,
+                    letterSpacing: 0.5,
+                  ),
+                ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _formatTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inDays > 30) {
+      return '${(difference.inDays / 30).floor()} MONTHS AGO';
+    } else if (difference.inDays > 0) {
+      return '${difference.inDays} DAYS AGO';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} HOURS AGO';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} MINUTES AGO';
+    } else {
+      return 'JUST NOW';
+    }
   }
 }
 
