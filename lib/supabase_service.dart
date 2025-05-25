@@ -86,6 +86,41 @@ class Post {
   }
 }
 
+class UserProfile {
+  final String id;
+  final String username;
+  final String fullName;
+  final String email;
+  final String? profession;
+  final String? iconPath;
+  final bool isVerified;
+  final DateTime accountCreationDate;
+
+  UserProfile({
+    required this.id,
+    required this.username,
+    required this.fullName,
+    required this.email,
+    this.profession,
+    this.iconPath,
+    this.isVerified = false,
+    required this.accountCreationDate,
+  });
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) {
+    return UserProfile(
+      id: json['user_id'] as String, // Assuming 'user_id' is the primary key in your 'users' table
+      username: json['username'] as String? ?? '',
+      fullName: json['full_name'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      profession: json['category'] as String? ?? 'N/A', // Using 'category' as profession, adjust if different
+      iconPath: json['icon_path'] as String? ?? 'graphics/Profile Icon.png', // Default icon, adjust if you have a field for this
+      isVerified: json['is_verified'] as bool? ?? false, // Adjust if you have a field for this
+      accountCreationDate: DateTime.parse(json['account_date_creation'] as String? ?? DateTime.now().toIso8601String()),
+    );
+  }
+}
+
 class SupabaseService {
   static final _logger = Logger('SupabaseService');
   
@@ -423,6 +458,25 @@ class SupabaseService {
     } catch (e) {
       _logger.severe('Error fetching user by username: $e');
       return null;
+    }
+  }
+
+  static Future<List<UserProfile>> searchUsers(String query) async {
+    if (query.isEmpty) {
+      return [];
+    }
+    try {
+      final response = await supabase
+          .from('users')
+          .select()
+          // Search in username and full_name. Adjust column names if necessary.
+          .or('username.ilike.%$query%,full_name.ilike.%$query%') 
+          .limit(10); // Limit results for performance and to avoid overwhelming the UI
+
+      return response.map((data) => UserProfile.fromJson(data)).toList();
+    } catch (e) {
+      _logger.severe('Error searching users: $e');
+      return [];
     }
   }
 }

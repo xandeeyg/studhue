@@ -15,11 +15,26 @@ class HomeScreenState extends State<HomeScreen> {
   bool _isSearchBarVisible = false;
   late Future<List<Post>> _postsFuture;
   String? _loggedInUsername;
+  final _searchController = TextEditingController();
+  List<UserProfile> _searchResults = [];
+  bool _isSearching = false;
+  String _currentSearchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _loadUsernameAndPosts();
+    _searchController.addListener(() {
+      if (_searchController.text.isEmpty && _currentSearchQuery.isNotEmpty) {
+        _clearSearch();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUsernameAndPosts() async {
@@ -41,6 +56,50 @@ class HomeScreenState extends State<HomeScreen> {
   void _toggleSearchBar() {
     setState(() {
       _isSearchBarVisible = !_isSearchBarVisible;
+      if (!_isSearchBarVisible) {
+        _clearSearch(); // Clear search when hiding the bar
+      }
+    });
+  }
+
+  Future<void> _performSearch(String query) async {
+    _currentSearchQuery = query;
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+    });
+
+    try {
+      final results = await SupabaseService.searchUsers(query);
+      setState(() {
+        _searchResults = results;
+      });
+    } catch (e) {
+      // Handle error, e.g., show a snackbar
+      print('Error searching users: $e');
+      setState(() {
+        _searchResults = [];
+      });
+    } finally {
+      setState(() {
+        _isSearching = false;
+      });
+    }
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    _currentSearchQuery = '';
+    setState(() {
+      _searchResults = [];
+      _isSearching = false;
     });
   }
 
@@ -52,7 +111,10 @@ class HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: _isSearchBarVisible
-            ? const SearchBar()
+            ? SearchBarWidget(
+                controller: _searchController,
+                onChanged: _performSearch,
+              )
             : Image.asset('graphics/Homeheader.png', height: 32),
         automaticallyImplyLeading: false,
         actions: [
@@ -70,29 +132,31 @@ class HomeScreenState extends State<HomeScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.only(bottom: 70), // space for nav bar
-            child: FutureBuilder<List<Post>>(
-              future: _postsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text('No posts available.'));
-                }
+            child: _isSearchBarVisible && _searchController.text.isNotEmpty
+                ? _buildSearchResults()
+                : FutureBuilder<List<Post>>(
+                    future: _postsFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      } else if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}'));
+                      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return const Center(child: Text('No posts available.'));
+                      }
 
-                final posts = snapshot.data!;
+                      final posts = snapshot.data!;
 
-                return ListView.builder(
-                  padding: EdgeInsets.zero,
-                  itemCount: posts.length,
-                  itemBuilder: (context, index) {
-                    final post = posts[index];
-                    return _buildPost(post);
-                  },
-                );
-              },
-            ),
+                      return ListView.builder(
+                        padding: EdgeInsets.zero,
+                        itemCount: posts.length,
+                        itemBuilder: (context, index) {
+                          final post = posts[index];
+                          return _buildPost(post);
+                        },
+                      );
+                    },
+                  ),
           ),
           Positioned(
             left: 0,
@@ -150,6 +214,40 @@ class HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    if (_isSearching) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_searchResults.isEmpty && _searchController.text.isNotEmpty) {
+      return const Center(child: Text('No users found.'));
+    }
+    if (_searchResults.isEmpty && _searchController.text.isEmpty) {
+      return const Center(child: Text('Type to search for users.')); // Or any placeholder
+    }
+
+    return ListView.builder(
+      itemCount: _searchResults.length,
+      itemBuilder: (context, index) {
+        final user = _searchResults[index];
+        // Navigate to user's profile on tap, or implement other interaction
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundImage: user.iconPath != null && user.iconPath!.startsWith('http')
+                ? NetworkImage(user.iconPath!)
+                : AssetImage(user.iconPath ?? 'graphics/Profile Icon.png') as ImageProvider,
+          ),
+          title: Text(user.fullName.isNotEmpty ? user.fullName : user.username),
+          subtitle: Text(user.profession ?? 'No profession listed'),
+          onTap: () {
+            // Example: Navigate to a user profile screen
+            // Navigator.push(context, MaterialPageRoute(builder: (context) => UserProfileScreen(userId: user.id)));
+            print('Tapped on user: ${user.username}');
+          },
+        );
+      },
     );
   }
 
@@ -369,8 +467,12 @@ class HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class SearchBar extends StatelessWidget {
-  const SearchBar({super.key});
+// Renamed to avoid conflict with Flutter's built-in SearchBar class
+class SearchBarWidget extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const SearchBarWidget({super.key, required this.controller, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -380,22 +482,33 @@ class SearchBar extends StatelessWidget {
         color: const Color(0xffd6d6d6),
         borderRadius: BorderRadius.circular(5),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          SizedBox(width: 8),
-          Icon(Icons.search, size: 20, color: Colors.grey),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
+          const Icon(Icons.search, size: 20, color: Colors.grey),
+          const SizedBox(width: 8),
           Expanded(
             child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search',
+              controller: controller,
+              onChanged: onChanged,
+              decoration: const InputDecoration(
+                hintText: 'Search users...',
                 hintStyle: TextStyle(color: Color.fromRGBO(123, 123, 123, 1)),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.only(bottom: 12),
               ),
             ),
           ),
-          SizedBox(width: 16),
+          // Optional: Add a clear button
+          if (controller.text.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.clear, size: 20, color: Colors.grey),
+              onPressed: () {
+                controller.clear();
+                onChanged(''); // Notify that search query is now empty
+              },
+            ),
+          const SizedBox(width: 8),
         ],
       ),
     );
