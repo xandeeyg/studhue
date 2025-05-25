@@ -9,12 +9,18 @@ import 'artvault_screen.dart';
 import 'notifications_screen.dart';
 import 'pinboards.dart';
 import 'profile.dart';
-import 'api_service.dart';
 import 'supabase_service.dart';
+import 'package:logging/logging.dart';
+import 'createpost_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  ApiService.setupLogging();
+  Logger.root.level = Level.ALL;
+  Logger.root.onRecord.listen((record) {
+    if (record.level.value >= Logger.root.level.value) {
+      debugPrint('${record.level.name}: ${record.time}: ${record.loggerName}: ${record.message}');
+    }
+  });
   
   // Initialize Supabase
   await SupabaseService.initialize();
@@ -44,6 +50,7 @@ class MyApp extends StatelessWidget {
         '/profile': (context) => const ProfileScreen(),
         '/pinboards': (context) => const PinboardsScreen(),
         '/notifications': (context) => const NotificationScreen(),
+        '/createpost': (context) => const CreatePostScreen(),
       },
     );
   }
