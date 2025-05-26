@@ -242,7 +242,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       try {
                                         await SupabaseService.signOutUser();
                                         if (mounted) {
-                                          Navigator.of(menuContext).pushNamedAndRemoveUntil('/log', (Route<dynamic> route) => false); // menuContext can also be used here
+                                          // Navigate to the login screen and clear navigation stack
+                                          Navigator.of(menuContext).pushNamedAndRemoveUntil('/log', (Route<dynamic> route) => false);
                                         }
                                       } catch (e) {
                                         print('Error during logout: $e');

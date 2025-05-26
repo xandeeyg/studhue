@@ -54,8 +54,8 @@ class Post {
   final String? variation;
   final int? quantity;
   final double? price;
-  final int likesCount;
-  final bool isLiked;
+  int likesCount;
+  bool isLiked;
   final bool isBookmarked;
 
   Post({
@@ -159,8 +159,18 @@ class PinboardInfo {
 }
 
 class SupabaseService {
-  static final _logger = Logger('SupabaseService');
   static final SupabaseClient supabase = Supabase.instance.client;
+  static final Logger _logger = Logger('SupabaseService');
+
+  /// Prints the current user's id to the debug console. Use this for Supabase troubleshooting.
+  static void printCurrentUserId() {
+    final user = supabase.auth.currentUser;
+    if (user != null) {
+      print('Current user id: ${user.id}');
+    } else {
+      print('No user is currently logged in.');
+    }
+  }
 
   // Initialize Supabase - call this in main.dart before runApp()
   static Future<void> initialize() async {
@@ -492,59 +502,83 @@ class SupabaseService {
   // Get posts
   static Future<List<Post>> getPosts() async {
     try {
+      final currentUser = supabase.auth.currentUser;
+      
+      // First, get all posts with like counts
       final allPostsResponse = await supabase
           .from('posts')
-          .select() 
+          .select()
           .order('created_at', ascending: false);
 
       final List<Map<String, dynamic>> allPostsData = List<Map<String, dynamic>>.from(allPostsResponse);
-      final currentUser = supabase.auth.currentUser;
+      
+      // Get the current user's liked post IDs if logged in
+      Set<String> likedPostIds = {};
       Set<String> allUserPinnedPostIds = {}; 
 
       if (currentUser != null) {
-        final userId = currentUser.id;
+        // Get user's liked posts
+        final likedPostsResponse = await supabase
+            .from('post_likes')
+            .select('post_id')
+            .eq('user_id', currentUser.id);
+            
+        if (likedPostsResponse != null) {
+          likedPostIds = likedPostsResponse
+              .map<String>((data) => data['post_id'] as String)
+              .toSet();
+        }
+        
+        // Get user's pinned posts
         final userBoardsResponse = await supabase
             .from('pinboards')
             .select('id')
-            .eq('user_id', userId);
-        
-        if (userBoardsResponse.isNotEmpty) {
-          final List<String> userBoardIds = userBoardsResponse
+            .eq('user_id', currentUser.id);
+            
+        if (userBoardsResponse != null && userBoardsResponse.isNotEmpty) {
+          final List<String> boardIds = userBoardsResponse
               .map<String>((board) => board['id'] as String)
               .toList();
-
+              
           final pinnedPostsResponse = await supabase
               .from('pinboard_posts')
               .select('post_id')
-              .inFilter('board_id', userBoardIds);
-            
-          allUserPinnedPostIds = pinnedPostsResponse
-              .map<String>((pin) => pin['post_id'] as String)
-              .toSet();
-          _logger.info('User $userId has ${allUserPinnedPostIds.length} unique posts pinned across all their boards.');
+              .inFilter('board_id', boardIds);
+              
+          if (pinnedPostsResponse != null) {
+            allUserPinnedPostIds = pinnedPostsResponse
+                .map<String>((data) => data['post_id'] as String)
+                .toSet();
+          }
         }
-      } else {
-        _logger.info('No user logged in. isBookmarked will be false for all posts.');
       }
 
-      final List<Post> postsToReturn = allPostsData.map<Post>((postJson) {
+      // Process posts with like and bookmark status
+      final postsToReturn = allPostsData.map<Post>((postJson) {
         final String postId = postJson['id']?.toString() ?? '';
         final bool isBookmarked = allUserPinnedPostIds.contains(postId);
+        final bool isLiked = likedPostIds.contains(postId);
         
-        final Map<String, dynamic> enrichedPostJson = Map.from(postJson);
+        final Map<String, dynamic> enrichedPostJson = Map<String, dynamic>.from(postJson);
         enrichedPostJson['is_bookmarked'] = isBookmarked;
+        enrichedPostJson['isLiked'] = isLiked;
+        
+        // Ensure like count is set
+        if (!enrichedPostJson.containsKey('likecount')) {
+          enrichedPostJson['likecount'] = 0;
+        }
+        
         return Post.fromJson(enrichedPostJson);
       }).toList();
 
-    // ADDED LOGGING AND RETURN HERE
-    _logger.info('SupabaseService.getPosts: Returning ${postsToReturn.length} posts.');
-    for (var post in postsToReturn) {
-      _logger.info('SupabaseService.getPosts: Post ID: ${post.id}, Caption: ${post.caption.substring(0, (post.caption.length > 20 ? 20 : post.caption.length))}...');
-    }
-    return postsToReturn; // Crucial return statement
-
+      _logger.info('SupabaseService.getPosts: Returning ${postsToReturn.length} posts.');
+      for (var post in postsToReturn) {
+        _logger.info('SupabaseService.getPosts: Post ID: ${post.id}, Caption: ${post.caption.substring(0, (post.caption.length > 20 ? 20 : post.caption.length))}..., isLiked: ${post.isLiked}');
+      }
+      
+      return postsToReturn;
     } catch (e) {
-      _logger.severe('Error fetching posts with multi-pinboard bookmark status: $e');
+      _logger.severe('Error fetching posts with like and bookmark status: $e');
       return [];
     }
   }
@@ -964,16 +998,94 @@ class SupabaseService {
 
   static Future<void> signOutUser() async {
     try {
+      // Sign out from Supabase auth
       await supabase.auth.signOut();
-      _logger.info('User signed out successfully.');
-      // Clear any local user session data if necessary (e.g., SharedPreferences)
+      _logger.info('User signed out successfully from Supabase auth.');
+      
+      // Clear all local user session data from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('user_id'); // Example: remove stored user_id
-      await prefs.remove('username'); // Example: remove stored username
-      // Add any other keys you might be storing for the user session
+      await prefs.remove('user_id');
+      await prefs.remove('username');
+      await prefs.remove('email');
+      // Clear any other user-related keys
+      await prefs.remove('profile_data');
+      await prefs.remove('auth_token');
+      
+      // Log the cleanup
+      _logger.info('Local user session data cleared successfully.');
     } catch (e) {
-      _logger.severe('Error signing out user: $e');
-      rethrow; // Rethrow to allow UI to handle error display
+      _logger.severe('Error during sign out process: $e');
+      // Still attempt to clear local data even if Supabase signOut fails
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('user_id');
+        await prefs.remove('username');
+        await prefs.remove('email');
+        await prefs.remove('profile_data');
+        await prefs.remove('auth_token');
+        _logger.info('Attempted to clear local data after signOut error.');
+      } catch (localError) {
+        _logger.severe('Error clearing local data: $localError');
+      }
+      
+      // Rethrow the original error to allow UI to handle it
+      rethrow;
+    }
+  }
+
+  // --- Like/Heart Functionality ---
+  static Future<bool> isPostLiked(String postId) async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return false;
+    final result = await supabase
+        .from('post_likes')
+        .select()
+        .eq('post_id', postId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+    return result != null;
+  }
+
+  static Future<bool> likePost(String postId) async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception("Not logged in");
+      
+      // First check if post is already liked
+      final isAlreadyLiked = await isPostLiked(postId);
+      if (isAlreadyLiked) {
+        _logger.info('Post $postId is already liked by user ${user.id}');
+        return true; // Return success as the intended state is achieved
+      }
+      
+      // Start a transaction
+      await supabase.rpc('like_post', params: {
+        'p_post_id': postId,  
+        'p_user_id': user.id,  
+      });
+      
+      return true;
+    } catch (e) {
+      _logger.severe('Error liking post: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> unlikePost(String postId) async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception("Not logged in");
+      
+      // Start a transaction
+      await supabase.rpc('unlike_post', params: {
+        'post_id': postId,
+        'user_id': user.id,
+      });
+      
+      return true;
+    } catch (e) {
+      _logger.severe('Error unliking post: $e');
+      return false;
     }
   }
 

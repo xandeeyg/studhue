@@ -18,17 +18,8 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     // Check if user is already authenticated
-    
-    // Listen for auth state changes
-    SupabaseService.supabase.auth.onAuthStateChange.listen((data) {
-      final event = data.event;
-      if (event == AuthChangeEvent.signedOut || event == AuthChangeEvent.userDeleted) {
-        // Redirect to login if signed out
-        if (mounted) {
-          Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-        }
-      }
-    });
+    // We don't need to listen for auth state changes here anymore
+    // This prevents a redirect loop when a user logs out and tries to log back in
   }
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
