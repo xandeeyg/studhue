@@ -500,10 +500,64 @@ class HomeScreenState extends State<HomeScreen> {
               children: [
                 Row(
                   children: [
-                    IconButton(
-                      icon: const Icon(LucideIcons.heart, size: 28),
-                      onPressed: () {},
-                    ),
+                    StatefulBuilder(
+  builder: (context, setState) {
+    // Create local state variables that start with the post's values
+    bool isLiked = post.isLiked;
+    int likesCount = post.likesCount;
+    bool isLiking = false;
+    
+    return IconButton(
+      icon: Icon(
+        isLiked ? LucideIcons.heart : LucideIcons.heart,
+        color: isLiked ? Colors.red : Colors.black,
+        size: 28,
+      ),
+      onPressed: isLiking
+          ? null
+          : () async {
+              setState(() => isLiking = true);
+              bool success;
+              
+              if (!isLiked) {
+                // Like the post
+                success = await SupabaseService.likePost(post.id);
+                if (success) {
+                  setState(() {
+                    isLiked = true;
+                    likesCount++;
+                    // Update the post object itself to maintain consistency
+                    post.isLiked = true;
+                    post.likesCount = likesCount;
+                  });
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to like post.')),
+                  );
+                }
+              } else {
+                // Unlike the post
+                success = await SupabaseService.unlikePost(post.id);
+                if (success) {
+                  setState(() {
+                    isLiked = false;
+                    likesCount = likesCount > 0 ? likesCount - 1 : 0;
+                    // Update the post object itself to maintain consistency
+                    post.isLiked = false;
+                    post.likesCount = likesCount;
+                  });
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to unlike post.')),
+                  );
+                }
+              }
+              
+              setState(() => isLiking = false);
+            },
+    );
+  },
+),
                     IconButton(
                       icon: const Icon(LucideIcons.message_circle, size: 28),
                       onPressed: () {},
@@ -634,13 +688,13 @@ class HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '1,234 likes', // Placeholder for actual like count
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
+                Text(
+  '${post.likesCount} likes',
+  style: const TextStyle(
+    fontWeight: FontWeight.bold,
+    fontSize: 14,
+  ),
+),
                 const SizedBox(height: 4),
                 if (post.caption.isNotEmpty)
                   RichText(
