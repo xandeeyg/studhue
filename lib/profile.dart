@@ -226,10 +226,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                           ],
                         ),
-                        actions: const [
-                          Padding(
-                            padding: EdgeInsets.only(right: 16.0),
-                            child: Icon(Icons.menu, color: Colors.black),
+                        actions: <Widget>[
+                          Builder(
+                            builder: (BuildContext menuContext) { // Use this new context for the SnackBar
+                              return PopupMenuButton<String>(
+                                icon: const Icon(Icons.menu, color: Colors.black),
+                                onSelected: (String result) async {
+                                  switch (result) {
+                                    case 'editProfile':
+                                      print('Edit Profile selected (from Builder context)');
+                                      Navigator.pushNamed(menuContext, '/edit_profile');
+                                      break;
+                                    case 'logout':
+                                      print('Logout selected');
+                                      try {
+                                        await SupabaseService.signOutUser();
+                                        if (mounted) {
+                                          Navigator.of(menuContext).pushNamedAndRemoveUntil('/log', (Route<dynamic> route) => false); // menuContext can also be used here
+                                        }
+                                      } catch (e) {
+                                        print('Error during logout: $e');
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(menuContext).showSnackBar( // menuContext here
+                                            SnackBar(content: Text('Logout failed: $e')),
+                                          );
+                                        }
+                                      }
+                                      break;
+                                  }
+                                },
+                                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                                  const PopupMenuItem<String>(
+                                    value: 'editProfile',
+                                    child: Text('Edit Profile'),
+                                  ),
+                                  const PopupMenuItem<String>(
+                                    value: 'logout',
+                                    child: Text('Logout'),
+                                  ),
+                                ],
+                              );
+                            }
                           ),
                         ],
                       ),
@@ -244,11 +281,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             radius: 40,
                             backgroundColor: Colors.grey[200],
                             child:
-                                profileData?['profile_picture'] != null
+                                profileData?['profile_image_url'] != null
                                     ? CircleAvatar(
                                       radius: 40,
                                       backgroundImage: NetworkImage(
-                                        profileData!['profile_picture'],
+                                        profileData!['profile_image_url'],
                                       ),
                                       onBackgroundImageError: (
                                         exception,

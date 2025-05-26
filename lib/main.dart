@@ -12,6 +12,7 @@ import 'profile.dart';
 import 'supabase_service.dart';
 import 'package:logging/logging.dart';
 import 'createpost_screen.dart';
+import 'edit_profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,6 +54,7 @@ class MyApp extends StatelessWidget {
         '/pinboards': (context) => const PinboardsScreen(),
         '/notifications': (context) => const NotificationScreen(),
         '/createpost': (context) => const CreatePostScreen(),
+        '/edit_profile': (context) => const EditProfileScreen(),
       },
       // We don't add user_profile to routes because it needs a username parameter
       // It will be accessed using Navigator.push instead

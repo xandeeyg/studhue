@@ -1,10 +1,11 @@
-import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logging/logging.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class VaultItem {
   final String username;
@@ -951,6 +952,86 @@ class SupabaseService {
         _logger.severe('StorageException details: ${e.message}, statusCode: ${e.statusCode}, error: ${e.error}');
       }
       return null; 
+    }
+  }
+
+  static Future<void> signOutUser() async {
+    try {
+      await supabase.auth.signOut();
+      _logger.info('User signed out successfully.');
+      // Clear any local user session data if necessary (e.g., SharedPreferences)
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user_id'); // Example: remove stored user_id
+      await prefs.remove('username'); // Example: remove stored username
+      // Add any other keys you might be storing for the user session
+    } catch (e) {
+      _logger.severe('Error signing out user: $e');
+      rethrow; // Rethrow to allow UI to handle error display
+    }
+  }
+
+  static Future<String?> uploadProfileImage(XFile imageFile, String userId) async {
+    try {
+      final String originalFileName = imageFile.name; // XFile.name usually includes the extension
+      final String fileExtension = originalFileName.contains('.') 
+          ? originalFileName.split('.').last 
+          : (imageFile.mimeType?.split('/').last ?? 'jpg'); // Fallback extension
+      
+      final String uniqueFileName = '${DateTime.now().millisecondsSinceEpoch}.${const Uuid().v4()}.$fileExtension';
+      final String filePath = '$userId/profile_pictures/$uniqueFileName';
+      String publicUrl;
+
+      if (kIsWeb) {
+        final Uint8List imageBytes = await imageFile.readAsBytes();
+        final String contentType = imageFile.mimeType ?? (fileExtension == 'png' ? 'image/png' : 'image/jpeg');
+        
+        await supabase.storage.from('profilepictures').uploadBinary(
+              filePath,
+              imageBytes,
+              fileOptions: FileOptions(contentType: contentType, upsert: false, cacheControl: '3600'),
+            );
+        _logger.info('Profile image uploaded (web) to: profilepictures/$filePath');
+      } else {
+        await supabase.storage.from('profilepictures').upload(
+              filePath,
+              File(imageFile.path),
+              fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+            );
+        _logger.info('Profile image uploaded (mobile/desktop) to: profilepictures/$filePath');
+      }
+
+      publicUrl = supabase.storage.from('profilepictures').getPublicUrl(filePath);
+      _logger.info('Public URL for profile image: $publicUrl');
+      return publicUrl;
+    } catch (e, stackTrace) {
+      _logger.severe('Error uploading profile image for user $userId: $e');
+      _logger.severe('Stack trace for profile image upload error: $stackTrace'); 
+      if (e is StorageException) {
+        _logger.severe('StorageException details: ${e.message}, statusCode: ${e.statusCode}, error: ${e.error}');
+      }
+      // Consider re-throwing a more specific error or returning a result object
+      return null;
+    }
+  }
+
+  // Method to update user profile information
+  static Future<bool> updateUserProfile(String userId, Map<String, dynamic> dataToUpdate) async {
+    try {
+      // Ensure we don't try to update with an empty map, though Supabase might handle it.
+      if (dataToUpdate.isEmpty) {
+        _logger.info('No data provided to update for user $userId.');
+        return true; // Or false, depending on desired behavior for no-op
+      }
+
+      await supabase.from('users').update(dataToUpdate).eq('user_id', userId);
+      _logger.info('User profile updated successfully for user $userId with data: $dataToUpdate');
+      return true;
+    } catch (e) {
+      _logger.severe('Error updating user profile for user $userId: $e');
+      if (e is PostgrestException) {
+        _logger.severe('PostgrestException details: ${e.message}, code: ${e.code}, details: ${e.details}');
+      }
+      return false;
     }
   }
 }
