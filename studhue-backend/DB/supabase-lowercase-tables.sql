@@ -71,3 +71,40 @@ CREATE TABLE IF NOT EXISTS pinboard_posts (
   FOREIGN KEY (board_id) REFERENCES pinboards(board_id) ON DELETE CASCADE,
   FOREIGN KEY (post_id) REFERENCES posts(post_id) ON DELETE CASCADE
 );
+
+-- Vault Items table for saving products to the art vault
+CREATE TABLE IF NOT EXISTS vault_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  username VARCHAR(100) NOT NULL,
+  productname VARCHAR(255) NOT NULL,
+  variation VARCHAR(100),
+  quantity INTEGER NOT NULL,
+  price DECIMAL(10, 2) NOT NULL,
+  icon_url TEXT,
+  image_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE
+);
+
+-- Enable Row Level Security
+ALTER TABLE vault_items ENABLE ROW LEVEL SECURITY;
+
+-- Create policy to allow users to view their own vault items
+CREATE POLICY "Users can view their own vault items"
+  ON vault_items FOR SELECT
+  USING (auth.uid() = (SELECT user_id FROM users WHERE username = vault_items.username));
+
+-- Create policy to allow users to insert their own vault items
+CREATE POLICY "Users can insert their own vault items"
+  ON vault_items FOR INSERT
+  WITH CHECK (auth.uid() = (SELECT user_id FROM users WHERE username = vault_items.username));
+
+-- Create policy to allow users to update their own vault items
+CREATE POLICY "Users can update their own vault items"
+  ON vault_items FOR UPDATE
+  USING (auth.uid() = (SELECT user_id FROM users WHERE username = vault_items.username));
+
+-- Create policy to allow users to delete their own vault items
+CREATE POLICY "Users can delete their own vault items"
+  ON vault_items FOR DELETE
+  USING (auth.uid() = (SELECT user_id FROM users WHERE username = vault_items.username));
