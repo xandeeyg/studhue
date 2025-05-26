@@ -43,6 +43,7 @@ dependencies:
   # Supabase
   supabase_flutter: ^2.3.4
   image_picker: ^1.1.2
+  uuid: ^4.3.3 # Added for generating unique IDs
 
 dev_dependencies:
   flutter_test:

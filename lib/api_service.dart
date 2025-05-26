@@ -36,9 +36,10 @@ class Post {
       userId: json['user_id'] ?? '',
       caption: json['caption'] ?? '',
       postType: json['post_type'] ?? 'regular',
-      postDate: json['post_date'] != null 
-          ? DateTime.parse(json['post_date'])
-          : DateTime.now(),
+      postDate:
+          json['post_date'] != null
+              ? DateTime.parse(json['post_date'])
+              : DateTime.now(),
       imageUrl: json['image_url'],
       username: json['username'] ?? 'Unknown',
       profilePicture: json['profile_picture'],
@@ -101,7 +102,9 @@ class ApiService {
   static void setupLogging() {
     Logger.root.level = Level.ALL; // Capture all logs
     Logger.root.onRecord.listen((record) {
-      print('${record.level.name}: ${record.time}: ${record.loggerName}: ${record.message}');
+      print(
+        '${record.level.name}: ${record.time}: ${record.loggerName}: ${record.message}',
+      );
     });
   }
 
@@ -198,14 +201,16 @@ class ApiService {
 
   // Fetch posts with user details
   static Future<List<Post>> fetchPosts() async {
-    final _logger = Logger('ApiService');
+    final logger = Logger('ApiService');
     try {
       // First, try to fetch from Supabase
       try {
         // Check if user is authenticated
         final user = SupabaseService.supabase.auth.currentUser;
         if (user == null) {
-          _logger.warning('JWT token not found; user might not be logged in. Using mock data.');
+          logger.warning(
+            'JWT token not found; user might not be logged in. Using mock data.',
+          );
           throw Exception('Not authenticated');
         }
 
@@ -217,36 +222,39 @@ class ApiService {
               user:user_id (username, profile_picture, category)
             ''')
             .order('post_date', ascending: false)
-            .timeout(const Duration(seconds: 3), onTimeout: () {
-              throw TimeoutException('Supabase request timed out');
-            });
-            
-        _logger.info('Successfully fetched ${response.length} posts from Supabase');
+            .timeout(
+              const Duration(seconds: 3),
+              onTimeout: () {
+                throw TimeoutException('Supabase request timed out');
+              },
+            );
 
-        return (response as List)
-            .map((data) => Post.fromJson(data))
-            .toList();
+        logger.info(
+          'Successfully fetched ${response.length} posts from Supabase',
+        );
+
+        return (response as List).map((data) => Post.fromJson(data)).toList();
       } catch (e) {
-        _logger.warning('Error fetching from Supabase: $e');
+        logger.warning('Error fetching from Supabase: $e');
         // Continue to the HTTP fallback
       }
 
       // Fallback to HTTP API if Supabase fails
       final token = await getToken();
-      final response = await http.get(
-        Uri.parse('$baseUrl/posts'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 5));
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/posts'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((json) => Post.fromJson(json)).toList();
       }
-      _logger.warning('Failed to fetch posts: ${response.statusCode}');
+      logger.warning('Failed to fetch posts: ${response.statusCode}');
     } catch (e) {
-      _logger.warning('Error fetching posts: $e');
+      logger.warning('Error fetching posts: $e');
     }
 
     // Return mock data when all else fails
@@ -289,7 +297,9 @@ class ApiService {
   }
 
   // Add product to vault
-  static Future<void> addProductToVault(Map<String, dynamic> productData) async {
+  static Future<void> addProductToVault(
+    Map<String, dynamic> productData,
+  ) async {
     final response = await http.post(
       Uri.parse('$baseUrl/vault/add'),
       headers: {'Content-Type': 'application/json'},

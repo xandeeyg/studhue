@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart'; 
+import 'dart:typed_data'; 
 
 class CreatePinboardDialog extends StatefulWidget {
   const CreatePinboardDialog({super.key});
@@ -13,8 +15,22 @@ class _CreatePinboardDialogState extends State<CreatePinboardDialog> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _coverImgController = TextEditingController();
+  Uint8List? _selectedImageBytes; 
+  String? _selectedImageName; 
+
+  final ImagePicker _picker = ImagePicker(); 
   bool _isLoading = false;
+
+  Future<void> _pickImage() async {
+    final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
+      setState(() {
+        _selectedImageBytes = bytes;
+        _selectedImageName = pickedFile.name; 
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,11 +52,42 @@ class _CreatePinboardDialogState extends State<CreatePinboardDialog> {
                 decoration: const InputDecoration(labelText: 'Board Description'),
                 validator: (v) => v == null || v.isEmpty ? 'Enter description' : null,
               ),
-              TextFormField(
-                controller: _coverImgController,
-                decoration: const InputDecoration(labelText: 'Cover Image URL'),
-                validator: (v) => v == null || v.isEmpty ? 'Enter image URL' : null,
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: _pickImage,
+                child: Container(
+                  height: 150,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[400]!)
+                  ),
+                  child: _selectedImageBytes != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(_selectedImageBytes!, fit: BoxFit.cover) 
+                        )
+                      : Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_photo_alternate_outlined, color: Colors.grey[600], size: 40),
+                              const SizedBox(height: 8),
+                              Text('Tap to select cover image', style: TextStyle(color: Colors.grey[600])),
+                            ],
+                          ),
+                        ),
+                ),
               ),
+              if (_selectedImageBytes == null) 
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    'Optional: Add a cover image for your pinboard.', 
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ),
             ],
           ),
         ),
@@ -64,14 +111,21 @@ class _CreatePinboardDialogState extends State<CreatePinboardDialog> {
                           const SnackBar(content: Text('Error: User not logged in.')),
                         );
                       }
-                      return; // Exit if no user is logged in
+                      return; 
                     }
                     final userId = currentUser.id;
+
+                    String coverImageUrl = ''; 
+                    if (_selectedImageBytes != null && _selectedImageName != null) {
+                      // In the NEXT STEP, we will upload _selectedImageBytes to Supabase Storage
+                      // using _selectedImageName.
+                      print('Image bytes selected: ${_selectedImageName} - UPLOAD LOGIC PENDING');
+                    }
 
                     await SupabaseService.createPinboard(
                       boardName: _nameController.text.trim(),
                       boardDescription: _descriptionController.text.trim(),
-                      coverImg: _coverImgController.text.trim(),
+                      coverImg: coverImageUrl, 
                       userId: userId,
                     );
                     if (!mounted) return;
@@ -79,7 +133,7 @@ class _CreatePinboardDialogState extends State<CreatePinboardDialog> {
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e')),
+                        SnackBar(content: Text('Error creating pinboard: $e')),
                       );
                     }
                   } finally {

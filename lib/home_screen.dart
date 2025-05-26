@@ -3,6 +3,7 @@ import 'supabase_service.dart'; // Import your existing API service
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+// import 'package:flutter_lucide/icons.dart'; // Removed incorrect import
 import 'user_profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -102,6 +103,112 @@ class HomeScreenState extends State<HomeScreen> {
       _searchResults = [];
       _isSearching = false;
     });
+  }
+
+  Future<void> _showPinboardsDialog(BuildContext context, Post post) async {
+    final List<PinboardInfo> userPinboards = await SupabaseService.getUserPinboards();
+
+    if (!mounted) return; // Check if the widget is still in the tree
+
+    if (userPinboards.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You have no pinboards. Create one first!')),
+      );
+      return;
+    }
+
+    // For each pinboard, check if the current post is on it
+    List<bool> isPostOnEachPinboard = [];
+    try {
+      isPostOnEachPinboard = await Future.wait(
+        userPinboards.map((pinboard) => SupabaseService.isPostOnPinboard(post.id, pinboard.id)).toList(),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error checking pinboard statuses: $e')),
+      );
+      return;
+    }
+    
+    if (!mounted) return; // Re-check after async operations
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        // Use a StatefulWidget for the dialog content if it needs its own internal state management for checkboxes
+        // For simplicity here, we'll manage it by rebuilding the dialog or relying on the post-action refresh
+        return AlertDialog(
+          title: Text('Save to Pinboard', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          contentPadding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 0),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: userPinboards.length,
+              itemBuilder: (BuildContext listContext, int index) {
+                final pinboard = userPinboards[index];
+                final bool isPinnedToThisBoard = isPostOnEachPinboard[index];
+                return ListTile(
+                  title: Text(pinboard.name, style: TextStyle(fontSize: 16)),
+                  trailing: Checkbox(
+                    value: isPinnedToThisBoard,
+                    onChanged: (bool? newValue) async {
+                      if (!mounted) return;
+                      Navigator.pop(dialogContext); // Close dialog immediately
+
+                      bool success;
+                      if (isPinnedToThisBoard) { // If it was pinned, unpin it
+                        success = await SupabaseService.removePostFromPinboard(post.id, pinboard.id);
+                      } else { // If it was not pinned, pin it
+                        success = await SupabaseService.addPostToPinboard(post.id, pinboard.id);
+                      }
+
+                      if (!mounted) return;
+                      if (success) {
+                        // Refresh all posts to update isBookmarked status correctly
+                        _loadUsernameAndPosts(); 
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to update pinboard.')),
+                        );
+                      }
+                    },
+                    activeColor: Color(0xFF5E4AD4), // Theme color
+                  ),
+                  onTap: () async { // Also allow tapping the row
+                     if (!mounted) return;
+                      Navigator.pop(dialogContext);
+                      bool success;
+                      if (isPinnedToThisBoard) {
+                        success = await SupabaseService.removePostFromPinboard(post.id, pinboard.id);
+                      } else {
+                        success = await SupabaseService.addPostToPinboard(post.id, pinboard.id);
+                      }
+                      if (!mounted) return;
+                      if (success) {
+                        _loadUsernameAndPosts();
+                      } else {
+                         ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to update pinboard.')),
+                        );
+                      }
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Close', style: TextStyle(color: Color(0xFF5E4AD4))), // Theme color
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -429,8 +536,14 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.bookmark_border, size: 28),
-                  onPressed: () {},
+                  icon: Icon(
+                    post.isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                    size: 28,
+                    color: post.isBookmarked ? Color(0xFF5E4AD4) : Colors.black, // Theme color if bookmarked
+                  ),
+                  onPressed: () {
+                    _showPinboardsDialog(context, post);
+                  },
                 ),
               ],
             ),

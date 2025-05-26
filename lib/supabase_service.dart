@@ -1,9 +1,10 @@
-import 'dart:typed_data';
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logging/logging.dart';
-import 'dart:io'; // Required for File type
+import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
-
+import 'dart:typed_data';
+import 'package:uuid/uuid.dart';
 
 class VaultItem {
   final String username;
@@ -52,6 +53,9 @@ class Post {
   final String? variation;
   final int? quantity;
   final double? price;
+  final int likesCount;
+  final bool isLiked;
+  final bool isBookmarked;
 
   Post({
     required this.id,
@@ -68,6 +72,9 @@ class Post {
     this.variation,
     this.quantity,
     this.price,
+    this.likesCount = 0,
+    this.isLiked = false,
+    this.isBookmarked = false,
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
@@ -80,12 +87,18 @@ class Post {
       postImagePath: json['post_image_path']?.toString() ?? '',
       iconPath: json['icon_path']?.toString() ?? '',
       caption: json['caption']?.toString() ?? '',
-      postDate: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
+      postDate:
+          json['created_at'] != null
+              ? DateTime.parse(json['created_at'])
+              : DateTime.now(),
       isProduct: json['is_product'] is bool ? json['is_product'] : false,
       productname: json['productname']?.toString(),
       variation: json['variation']?.toString(),
       quantity: json['quantity'] is int ? json['quantity'] : null,
       price: (json['price'] as num?)?.toDouble(),
+      likesCount: json['likecount'] as int? ?? 0,
+      isLiked: json['isLiked'] as bool? ?? false,
+      isBookmarked: json['is_bookmarked'] as bool? ?? false,
     );
   }
 }
@@ -120,7 +133,26 @@ class UserProfile {
       profession: json['category'] as String? ?? 'N/A',
       iconPath: json['profile_picture'] ?? 'graphics/Profile Icon.png',
       isVerified: json['is_verified'] as bool? ?? false,
-      accountCreationDate: DateTime.parse(json['account_date_creation'] as String? ?? DateTime.now().toIso8601String()),
+      accountCreationDate: DateTime.parse(
+        json['account_date_creation'] as String? ??
+            DateTime.now().toIso8601String(),
+      ),
+    );
+  }
+}
+
+class PinboardInfo {
+  final String id;
+  final String name;
+  final String? coverImageUrl;
+
+  PinboardInfo({required this.id, required this.name, this.coverImageUrl});
+
+  factory PinboardInfo.fromJson(Map<String, dynamic> json) {
+    return PinboardInfo(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      coverImageUrl: json['cover_img_url'] as String?, 
     );
   }
 }
@@ -133,7 +165,8 @@ class SupabaseService {
   static Future<void> initialize() async {
     await Supabase.initialize(
       url: 'https://guhabojbordlqekofdlz.supabase.co',
-      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1aGFib2pib3JkbHFla29mZGx6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgxNTc1NzMsImV4cCI6MjA2MzczMzU3M30.rAuS0CARpDZzB1K-X71PtZWDIeXDpN-wrVNhQT5wMvk',
+      anonKey:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1aGFib2pib3JkbHFla29mZGx6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgxNTc1NzMsImV4cCI6MjA2MzczMzU3M30.rAuS0CARpDZzB1K-X71PtZWDIeXDpN-wrVNhQT5wMvk',
     );
     _logger.info('Supabase initialized');
   }
@@ -160,18 +193,19 @@ class SupabaseService {
       final String userId = authResponse.user!.id;
       _logger.info('Auth user created with ID: $userId');
       try {
-        final response = await supabase.from('users').insert({
-          'user_id': userId,
-          'email': email,
-          'full_name': fullName,
-          'username': username,
-          'age': int.tryParse(age),
-          'address': address,
-          'phone_number': phoneNumber,
-          'password': password,
-          'category': category,
-          'account_date_creation': DateTime.now().toIso8601String(),
-        }).select();
+        final response =
+            await supabase.from('users').insert({
+              'user_id': userId,
+              'email': email,
+              'full_name': fullName,
+              'username': username,
+              'age': int.tryParse(age),
+              'address': address,
+              'phone_number': phoneNumber,
+              'password': password,
+              'category': category,
+              'account_date_creation': DateTime.now().toIso8601String(),
+            }).select();
         _logger.info('Insert response: $response');
       } catch (e) {
         _logger.severe('Error inserting user data: $e');
@@ -180,24 +214,14 @@ class SupabaseService {
       return {
         'success': true,
         'message': 'Account created successfully',
-        'user': {
-          'user_id': userId,
-          'email': email,
-          'username': username,
-        }
+        'user': {'user_id': userId, 'email': email, 'username': username},
       };
     } on AuthException catch (e) {
       _logger.severe('Auth error during signup: ${e.message}');
-      return {
-        'success': false,
-        'message': e.message,
-      };
+      return {'success': false, 'message': e.message};
     } catch (e) {
       _logger.severe('Error during signup: $e');
-      return {
-        'success': false,
-        'message': e.toString(),
-      };
+      return {'success': false, 'message': e.toString()};
     }
   }
 
@@ -216,11 +240,12 @@ class SupabaseService {
       }
       Map<String, dynamic>? userData;
       try {
-        userData = await supabase
-            .from('users')
-            .select()
-            .eq('user_id', response.user!.id)
-            .single();
+        userData =
+            await supabase
+                .from('users')
+                .select()
+                .eq('user_id', response.user!.id)
+                .single();
         _logger.info('Retrieved user data: $userData');
       } catch (e) {
         _logger.warning('Could not retrieve user profile: $e');
@@ -232,20 +257,14 @@ class SupabaseService {
           'user_id': response.user!.id,
           'email': response.user!.email,
           'username': userData?['username'] ?? '',
-        }
+        },
       };
     } on AuthException catch (e) {
       _logger.severe('Auth error during login: ${e.message}');
-      return {
-        'success': false,
-        'message': e.message,
-      };
+      return {'success': false, 'message': e.message};
     } catch (e) {
       _logger.severe('Error during login: $e');
-      return {
-        'success': false,
-        'message': e.toString(),
-      };
+      return {'success': false, 'message': e.toString()};
     }
   }
 
@@ -267,14 +286,99 @@ class SupabaseService {
         _logger.warning('No user is currently logged in');
         return null;
       }
-      final response = await supabase
+
+      // Fetch basic user profile data
+      final profileResponse =
+          await supabase.from('users').select().eq('user_id', user.id).single();
+
+      // Fetch post count
+      final postCountResponse = await supabase
+          .from('posts')
+          .select('id') 
+          .eq('user_id', user.id)
+          .count(); 
+      final postCount = postCountResponse.count;
+
+      // Fetch followers count
+      final followersCountResponse = await supabase
+          .from('followers')
+          .select('follower_id') 
+          .eq('following_id', user.id)
+          .count(); 
+      final followersCount = followersCountResponse.count;
+
+      // Fetch following count
+      final followingCountResponse = await supabase
+          .from('followers')
+          .select('following_id') 
+          .eq('follower_id', user.id)
+          .count(); 
+      final followingCount = followingCountResponse.count;
+
+      // Combine all data
+      final Map<String, dynamic> userProfileData = Map.from(profileResponse);
+      userProfileData['post_count'] = postCount;
+      userProfileData['followers'] = followersCount;
+      userProfileData['following'] = followingCount;
+
+      _logger.info('User profile data with counts: $userProfileData');
+      return userProfileData;
+    } catch (e) {
+      _logger.severe('Error getting user profile with counts: $e');
+      return null;
+    }
+  }
+
+  // Method to get user profile by specific ID, including counts
+  static Future<Map<String, dynamic>?> getUserProfileById(String userId) async {
+    try {
+      _logger.info('Fetching profile for user ID: $userId');
+
+      // Fetch basic user profile data
+      final profileResponse = await supabase
           .from('users')
           .select()
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .single();
-      return response;
+
+      // Fetch post count
+      final postCountResponse = await supabase
+          .from('posts')
+          .select('id') 
+          .eq('user_id', userId)
+          .count();
+      final postCount = postCountResponse.count;
+
+      // Fetch followers count
+      final followersCountResponse = await supabase
+          .from('followers')
+          .select('follower_id') 
+          .eq('following_id', userId)
+          .count();
+      final followersCount = followersCountResponse.count;
+
+      // Fetch following count
+      final followingCountResponse = await supabase
+          .from('followers')
+          .select('following_id') 
+          .eq('follower_id', userId)
+          .count();
+      final followingCount = followingCountResponse.count;
+
+      // Combine all data
+      final Map<String, dynamic> userProfileData = Map.from(profileResponse);
+      userProfileData['post_count'] = postCount;
+      userProfileData['followers'] = followersCount;
+      userProfileData['following'] = followingCount;
+
+      _logger.info('User profile data with counts for $userId: $userProfileData');
+      return userProfileData;
     } catch (e) {
-      _logger.severe('Error getting user profile: $e');
+      _logger.severe('Error getting user profile by ID for $userId: $e');
+      if (e is PostgrestException && e.code == 'PGRST116') {
+        _logger.warning('User with ID $userId not found.');
+        return null; 
+      }
       return null;
     }
   }
@@ -288,11 +392,8 @@ class SupabaseService {
     bool isProduct = false,
   }) async {
     try {
-      final userProfileResponse = await supabase
-          .from('users')
-          .select()
-          .eq('user_id', userId)
-          .single();
+      final userProfileResponse =
+          await supabase.from('users').select().eq('user_id', userId).single();
       final Map<String, dynamic> postData = {
         'user_id': userId,
         'caption': caption,
@@ -305,17 +406,16 @@ class SupabaseService {
         'is_verified': userProfileResponse['is_verified'] ?? false,
         'verified_offset': 4.0,
         'post_image_path': imageUrl,
-        'icon_path': userProfileResponse['profile_picture'] ?? 'graphics/Profile Icon.png',
+        'icon_path':
+            userProfileResponse['profile_picture'] ??
+            'graphics/Profile Icon.png',
         'productname': null,
         'variation': null,
         'quantity': null,
         'price': null,
       };
-      final response = await supabase
-          .from('posts')
-          .insert(postData)
-          .select('id')
-          .single();
+      final response =
+          await supabase.from('posts').insert(postData).select('id').single();
       final String postId = response['id'] as String;
       _logger.info('Post created with ID: $postId');
       return postId;
@@ -330,23 +430,22 @@ class SupabaseService {
     required String boardName,
     required String boardDescription,
     required String coverImg,
-    // Assuming userId is needed to associate the pinboard with a user
     required String userId,
   }) async {
     try {
       await supabase
-          .from('pinboards') // Ensure 'pinboards' is your table name
+          .from('pinboards') 
           .insert({
-            'board_name': boardName,
-            'board_description': boardDescription,
-            'cover_img': coverImg, // Ensure column names match your DB schema
-            'user_id': userId, // Ensure column names match your DB schema
+            'name': boardName, 
+            'board_description': boardDescription, 
+            'cover_img_url': coverImg, 
+            'user_id': userId, 
             'created_at': DateTime.now().toIso8601String(),
           });
       _logger.info('Pinboard created: $boardName');
     } catch (e) {
       _logger.severe('Error creating pinboard: $e');
-      rethrow; // Rethrow the exception to be handled by the caller
+      rethrow; 
     }
   }
 
@@ -361,18 +460,16 @@ class SupabaseService {
     required String imageUrl,
   }) async {
     try {
-      await supabase
-          .from('vault_items')
-          .insert({
-            'username': username,
-            'productname': productname,
-            'variation': variation,
-            'quantity': quantity,
-            'price': price,
-            'icon_url': iconUrl,
-            'image_url': imageUrl,
-            'created_at': DateTime.now().toIso8601String(),
-          });
+      await supabase.from('vault_items').insert({
+        'username': username,
+        'productname': productname,
+        'variation': variation,
+        'quantity': quantity,
+        'price': price,
+        'icon_url': iconUrl,
+        'image_url': imageUrl,
+        'created_at': DateTime.now().toIso8601String(),
+      });
       _logger.info('Added to vault: $productname');
     } catch (e) {
       _logger.severe('Error adding to vault: $e');
@@ -383,10 +480,7 @@ class SupabaseService {
   // Delete post
   static Future<void> deletePost(String id) async {
     try {
-      await supabase
-          .from('posts')
-          .delete()
-          .eq('id', id);
+      await supabase.from('posts').delete().eq('id', id);
       _logger.info('Post deleted: $id');
     } catch (e) {
       _logger.severe('Error deleting post: $e');
@@ -397,13 +491,52 @@ class SupabaseService {
   // Get posts
   static Future<List<Post>> getPosts() async {
     try {
-      final response = await supabase
+      final allPostsResponse = await supabase
           .from('posts')
-          .select()
+          .select() 
           .order('created_at', ascending: false);
-      return response.map<Post>((post) => Post.fromJson(post)).toList();
+
+      final List<Map<String, dynamic>> allPostsData = List<Map<String, dynamic>>.from(allPostsResponse);
+      final currentUser = supabase.auth.currentUser;
+      Set<String> allUserPinnedPostIds = {}; 
+
+      if (currentUser != null) {
+        final userId = currentUser.id;
+        final userBoardsResponse = await supabase
+            .from('pinboards')
+            .select('id')
+            .eq('user_id', userId);
+        
+        if (userBoardsResponse.isNotEmpty) {
+          final List<String> userBoardIds = userBoardsResponse
+              .map<String>((board) => board['id'] as String)
+              .toList();
+
+          final pinnedPostsResponse = await supabase
+              .from('pinboard_posts')
+              .select('post_id')
+              .inFilter('board_id', userBoardIds);
+            
+          allUserPinnedPostIds = pinnedPostsResponse
+              .map<String>((pin) => pin['post_id'] as String)
+              .toSet();
+          _logger.info('User $userId has ${allUserPinnedPostIds.length} unique posts pinned across all their boards.');
+        }
+      } else {
+        _logger.info('No user logged in. isBookmarked will be false for all posts.');
+      }
+
+      return allPostsData.map<Post>((postJson) {
+        final String postId = postJson['id']?.toString() ?? '';
+        final bool isBookmarked = allUserPinnedPostIds.contains(postId);
+        
+        final Map<String, dynamic> enrichedPostJson = Map.from(postJson);
+        enrichedPostJson['is_bookmarked'] = isBookmarked;
+        return Post.fromJson(enrichedPostJson);
+      }).toList();
+
     } catch (e) {
-      _logger.severe('Error fetching posts: $e');
+      _logger.severe('Error fetching posts with multi-pinboard bookmark status: $e');
       return [];
     }
   }
@@ -415,10 +548,14 @@ class SupabaseService {
           .from('pinboards')
           .select()
           .order('created_at', ascending: false);
-      return pinboards.map<Map<String, String>>((pinboard) => {
-        'name': pinboard['name']?.toString() ?? '',
-        'coverImg': pinboard['coverImg']?.toString() ?? '',
-      }).toList();
+      return pinboards
+          .map<Map<String, String>>(
+            (pinboard) => {
+              'name': pinboard['name']?.toString() ?? '',
+              'coverImg': pinboard['coverImg']?.toString() ?? '',
+            },
+          )
+          .toList();
     } catch (e) {
       _logger.severe('Error fetching pinboards: $e');
       return [];
@@ -432,7 +569,9 @@ class SupabaseService {
           .from('vault_items')
           .select()
           .order('created_at', ascending: false);
-      return response.map<VaultItem>((item) => VaultItem.fromJson(item)).toList();
+      return response
+          .map<VaultItem>((item) => VaultItem.fromJson(item))
+          .toList();
     } catch (e) {
       _logger.severe('Error fetching vault items: $e');
       return [];
@@ -440,13 +579,16 @@ class SupabaseService {
   }
 
   // Get user by username
-  static Future<Map<String, dynamic>?> getUserByUsername(String username) async {
+  static Future<Map<String, dynamic>?> getUserByUsername(
+    String username,
+  ) async {
     try {
-      final response = await supabase
-          .from('users')
-          .select()
-          .eq('username', username)
-          .maybeSingle();
+      final response =
+          await supabase
+              .from('users')
+              .select()
+              .eq('username', username)
+              .maybeSingle();
       return response;
     } catch (e) {
       _logger.severe('Error fetching user by username: $e');
@@ -465,7 +607,9 @@ class SupabaseService {
           .select()
           .or('username.ilike.%$query%,full_name.ilike.%$query%')
           .limit(10);
-      return response.map<UserProfile>((data) => UserProfile.fromJson(data)).toList();
+      return response
+          .map<UserProfile>((data) => UserProfile.fromJson(data))
+          .toList();
     } catch (e) {
       _logger.severe('Error searching users: $e');
       return [];
@@ -475,7 +619,8 @@ class SupabaseService {
   // Upload a file
   static Future<String?> uploadFile(File file, String userId) async {
     try {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
       final String storagePath = 'public/$userId/$fileName';
       await supabase.storage
           .from('posts_media')
@@ -496,7 +641,10 @@ class SupabaseService {
   }
 
   // Upload post image (supports both File and Uint8List)
-  static Future<String> uploadPostImage(dynamic imageFile, String userId) async {
+  static Future<String> uploadPostImage(
+    dynamic imageFile,
+    String userId,
+  ) async {
     try {
       final fileName = DateTime.now().millisecondsSinceEpoch.toString();
       String filePath;
@@ -505,31 +653,187 @@ class SupabaseService {
         filePath = '$userId/$fileName';
         String contentType = 'image/jpeg';
         if (imageFile is List<int> && imageFile.length > 4) {
-          if (imageFile[0] == 0x89 && imageFile[1] == 0x50 && imageFile[2] == 0x4E && imageFile[3] == 0x47) {
+          if (imageFile[0] == 0x89 &&
+              imageFile[1] == 0x50 &&
+              imageFile[2] == 0x4E &&
+              imageFile[3] == 0x47) {
             contentType = 'image/png';
           }
         }
         final storageResponse = await supabase.storage
             .from('post-media')
-            .uploadBinary(filePath, imageFile, fileOptions: FileOptions(contentType: contentType));
-        _logger.info('Image uploaded (web) to: post-media/$filePath, response: $storageResponse');
+            .uploadBinary(
+              filePath,
+              imageFile,
+              fileOptions: FileOptions(contentType: contentType),
+            );
+        _logger.info(
+          'Image uploaded (web) to: post-media/$filePath, response: $storageResponse',
+        );
       } else {
         final fileNameWithExt = imageFile.path.split('/').last;
-        filePath = '$userId/${DateTime.now().millisecondsSinceEpoch}_$fileNameWithExt';
-        String contentType = fileNameWithExt.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+        filePath =
+            '$userId/${DateTime.now().millisecondsSinceEpoch}_$fileNameWithExt';
+        String contentType =
+            fileNameWithExt.toLowerCase().endsWith('.png')
+                ? 'image/png'
+                : 'image/jpeg';
         final storageResponse = await supabase.storage
             .from('post-media')
-            .upload(filePath, imageFile, fileOptions: FileOptions(contentType: contentType));
-        _logger.info('Image uploaded (mobile/desktop) to: post-media/$filePath, response: $storageResponse');
+            .upload(
+              filePath,
+              imageFile,
+              fileOptions: FileOptions(contentType: contentType),
+            );
+        _logger.info(
+          'Image uploaded (mobile/desktop) to: post-media/$filePath, response: $storageResponse',
+        );
       }
-      publicUrl = supabase.storage
-          .from('post-media')
-          .getPublicUrl(filePath);
+      publicUrl = supabase.storage.from('post-media').getPublicUrl(filePath);
       _logger.info('Public URL for image: $publicUrl');
       return publicUrl;
     } catch (e) {
       _logger.severe('Error uploading image to Supabase Storage: $e');
       rethrow;
+    }
+  }
+
+  // Get all pinboards (id and name) for the current user
+  static Future<List<PinboardInfo>> getUserPinboards() async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) {
+      _logger.warning('Cannot get user pinboards: No user logged in.');
+      return [];
+    }
+    _logger.info('Fetching pinboards for user ID: ${currentUser.id}');
+
+    try {
+      final response = await supabase
+          .from('pinboards')
+          .select('id, name, cover_img_url') 
+          .eq('user_id', currentUser.id)
+          .order('created_at', ascending: true); 
+
+      final pinboards = response
+          .map((item) => PinboardInfo.fromJson(item))
+          .toList();
+      _logger.info('Fetched ${pinboards.length} pinboards for user ${currentUser.id}');
+      return pinboards;
+    } catch (e) {
+      _logger.severe('Error fetching pinboards for user ${currentUser.id}: $e');
+      return [];
+    }
+  }
+
+  // Add a post to a specific pinboard
+  static Future<bool> addPostToPinboard(String postId, String boardId) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) {
+      _logger.warning('Cannot add post to pinboard: No user logged in.');
+      return false;
+    }
+    try {
+      final existingPin = await supabase
+          .from('pinboard_posts')
+          .select('post_id') 
+          .eq('board_id', boardId)
+          .eq('post_id', postId)
+          .maybeSingle();
+      
+      if (existingPin != null) {
+        _logger.info('Post $postId is already pinned to board $boardId.');
+        return true; 
+      }
+
+      await supabase.from('pinboard_posts').insert({
+        'board_id': boardId,
+        'post_id': postId,
+      });
+      _logger.info('Post $postId added to pinboard $boardId.');
+      return true;
+    } catch (e) {
+      _logger.severe('Error adding post $postId to pinboard $boardId: $e');
+      return false;
+    }
+  }
+
+  // Remove a post from a specific pinboard
+  static Future<bool> removePostFromPinboard(String postId, String boardId) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) {
+      _logger.warning('Cannot remove post from pinboard: No user logged in.');
+      return false;
+    }
+
+    try {
+      await supabase
+          .from('pinboard_posts')
+          .delete()
+          .eq('board_id', boardId)
+          .eq('post_id', postId);
+      _logger.info('Post $postId removed from pinboard $boardId.');
+      return true;
+    } catch (e) {
+      _logger.severe('Error removing post $postId from pinboard $boardId: $e');
+      return false;
+    }
+  }
+
+  // Get all posts for a specific pinboard_id
+  static Future<List<Post>> getPostsForPinboard(String boardId) async {
+    try {
+      final pinboardPostsResponse = await supabase
+          .from('pinboard_posts')
+          .select('post_id')
+          .eq('board_id', boardId);
+
+      if (pinboardPostsResponse.isEmpty) {
+        _logger.info('No posts found for pinboard $boardId.');
+        return [];
+      }
+
+      final List<String> postIds = pinboardPostsResponse
+          .map<String>((data) => data['post_id'] as String)
+          .toList();
+
+      if (postIds.isEmpty) return [];
+
+      final postsData = await supabase
+          .from('posts')
+          .select()
+          .inFilter('id', postIds)
+          .order('created_at', ascending: false);
+
+      return postsData.map<Post>((postJson) {
+        final enrichedJson = Map<String, dynamic>.from(postJson);
+        enrichedJson['is_bookmarked'] = true; 
+        return Post.fromJson(enrichedJson);
+      }).toList();
+
+    } catch (e) {
+      _logger.severe('Error fetching posts for pinboard $boardId: $e');
+      return [];
+    }
+  }
+
+  // Check if a specific post is on a specific pinboard
+  static Future<bool> isPostOnPinboard(String postId, String boardId) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) {
+      return false; 
+    }
+    try {
+      final existingPin = await supabase
+          .from('pinboard_posts')
+          .select('post_id') 
+          .eq('board_id', boardId)
+          .eq('post_id', postId)
+          .maybeSingle();
+      
+      return existingPin != null;
+    } catch (e) {
+      _logger.severe('Error checking if post $postId is on pinboard $boardId: $e');
+      return false; 
     }
   }
 
@@ -541,12 +845,13 @@ class SupabaseService {
         _logger.warning('Cannot follow user: No user is logged in');
         return false;
       }
-      final existingFollow = await supabase
-          .from('followers')
-          .select()
-          .eq('follower_id', currentUser.id)
-          .eq('following_id', targetUserId)
-          .maybeSingle();
+      final existingFollow =
+          await supabase
+              .from('followers')
+              .select()
+              .eq('follower_id', currentUser.id)
+              .eq('following_id', targetUserId)
+              .maybeSingle();
       if (existingFollow != null) {
         _logger.info('Already following this user');
         return true;
@@ -554,7 +859,6 @@ class SupabaseService {
       await supabase.from('followers').insert({
         'follower_id': currentUser.id,
         'following_id': targetUserId,
-        'created_at': DateTime.now().toIso8601String(),
       });
       _logger.info('Successfully followed user: $targetUserId');
       return true;
@@ -592,16 +896,61 @@ class SupabaseService {
       if (currentUser == null) {
         return false;
       }
-      final existingFollow = await supabase
-          .from('followers')
-          .select()
-          .eq('follower_id', currentUser.id)
-          .eq('following_id', targetUserId)
-          .maybeSingle();
+      final existingFollow =
+          await supabase
+              .from('followers')
+              .select()
+              .eq('follower_id', currentUser.id)
+              .eq('following_id', targetUserId)
+              .maybeSingle();
       return existingFollow != null;
     } catch (e) {
       _logger.severe('Error checking follow status: $e');
       return false;
+    }
+  }
+
+  static Future<String?> uploadPinboardCoverImage({
+    required String userId,
+    required Uint8List imageBytes,
+    required String fileName, 
+    String? mimeType,       
+  }) async {
+    const String storageBucket = 'pinboard_covers'; 
+    _logger.info('Attempting to upload cover image. Bucket: $storageBucket, User: $userId, Filename: $fileName, MimeType: $mimeType');
+
+    try {
+      String extension = 'jpg'; 
+      if (fileName.contains('.')) {
+        final parts = fileName.split('.');
+        if (parts.length > 1) {
+          extension = parts.last.toLowerCase();
+        }
+      }
+      
+      final uniqueFileNameWithExtension = '${const Uuid().v4()}.$extension';
+      final filePath = '$userId/$uniqueFileNameWithExtension'; 
+
+      _logger.info('Uploading to path: $filePath');
+
+      await supabase.storage.from(storageBucket).uploadBinary(
+            filePath,
+            imageBytes,
+            fileOptions: FileOptions(
+              contentType: mimeType ?? (extension == 'png' ? 'image/png' : 'image/jpeg'), 
+            ),
+          );
+      _logger.info('Binary upload successful for path: $filePath');
+
+      final publicUrl = supabase.storage.from(storageBucket).getPublicUrl(filePath);
+      _logger.info('Image successfully uploaded. Public URL: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      _logger.severe('Error uploading pinboard cover image to Supabase Storage: $e');
+      if (e is StorageException) {
+        _logger.severe('StorageException details: ${e.message}, statusCode: ${e.statusCode}, error: ${e.error}');
+      }
+      return null; 
     }
   }
 }

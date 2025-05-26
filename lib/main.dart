@@ -9,7 +9,6 @@ import 'artvault_screen.dart';
 import 'notifications_screen.dart';
 import 'pinboards.dart';
 import 'profile.dart';
-import 'user_profile_screen.dart';
 import 'supabase_service.dart';
 import 'package:logging/logging.dart';
 import 'createpost_screen.dart';
@@ -19,13 +18,15 @@ void main() async {
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
     if (record.level.value >= Logger.root.level.value) {
-      debugPrint('${record.level.name}: ${record.time}: ${record.loggerName}: ${record.message}');
+      debugPrint(
+        '${record.level.name}: ${record.time}: ${record.loggerName}: ${record.message}',
+      );
     }
   });
-  
+
   // Initialize Supabase
   await SupabaseService.initialize();
-  
+
   runApp(const MyApp());
 }
 
