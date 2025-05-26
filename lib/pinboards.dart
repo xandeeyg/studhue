@@ -121,6 +121,11 @@ class _PinboardsScreenState extends State<PinboardsScreen> {
                   }
 
                   final pinboards = snapshot.data!;
+                  // Log the cover image URLs for debugging
+                  for (var board in pinboards) {
+                    print('Pinboard: ${board.name}, Cover Image URL: ${board.coverImageUrl}');
+                  }
+
                   return GridView.builder(
                     padding: const EdgeInsets.all(16),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

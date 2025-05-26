@@ -1,7 +1,10 @@
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logging/logging.dart';
-import 'dart:io'; // Required for File type
+import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:typed_data';
+import 'package:uuid/uuid.dart';
 
 class VaultItem {
   final String username;
@@ -149,7 +152,7 @@ class PinboardInfo {
     return PinboardInfo(
       id: json['id'] as String,
       name: json['name'] as String,
-      coverImageUrl: json['cover_img_url'] as String?, // Corrected from cover_image_url
+      coverImageUrl: json['cover_img_url'] as String?, 
     );
   }
 }
@@ -291,25 +294,25 @@ class SupabaseService {
       // Fetch post count
       final postCountResponse = await supabase
           .from('posts')
-          .select('id') // Select a column to count, 'id' is usually fine
+          .select('id') 
           .eq('user_id', user.id)
-          .count(); // Use the count() method here
+          .count(); 
       final postCount = postCountResponse.count;
 
       // Fetch followers count
       final followersCountResponse = await supabase
           .from('followers')
-          .select('follower_id') // Select a column to count
+          .select('follower_id') 
           .eq('following_id', user.id)
-          .count(); // Use the count() method here
+          .count(); 
       final followersCount = followersCountResponse.count;
 
       // Fetch following count
       final followingCountResponse = await supabase
           .from('followers')
-          .select('following_id') // Select a column to count
+          .select('following_id') 
           .eq('follower_id', user.id)
-          .count(); // Use the count() method here
+          .count(); 
       final followingCount = followingCountResponse.count;
 
       // Combine all data
@@ -374,7 +377,6 @@ class SupabaseService {
       _logger.severe('Error getting user profile by ID for $userId: $e');
       if (e is PostgrestException && e.code == 'PGRST116') {
         _logger.warning('User with ID $userId not found.');
-        // Optionally return a specific structure or null if user not found
         return null; 
       }
       return null;
@@ -428,23 +430,22 @@ class SupabaseService {
     required String boardName,
     required String boardDescription,
     required String coverImg,
-    // Assuming userId is needed to associate the pinboard with a user
     required String userId,
   }) async {
     try {
       await supabase
-          .from('pinboards') // Ensure 'pinboards' is your table name
+          .from('pinboards') 
           .insert({
-            'name': boardName, // Changed from 'board_name'
-            'board_description': boardDescription, // This is stored but not currently fetched by PinboardInfo
-            'cover_img_url': coverImg, // Corrected from cover_image_url
-            'user_id': userId, // Ensure column names match your DB schema
+            'name': boardName, 
+            'board_description': boardDescription, 
+            'cover_img_url': coverImg, 
+            'user_id': userId, 
             'created_at': DateTime.now().toIso8601String(),
           });
       _logger.info('Pinboard created: $boardName');
     } catch (e) {
       _logger.severe('Error creating pinboard: $e');
-      rethrow; // Rethrow the exception to be handled by the caller
+      rethrow; 
     }
   }
 
@@ -497,11 +498,10 @@ class SupabaseService {
 
       final List<Map<String, dynamic>> allPostsData = List<Map<String, dynamic>>.from(allPostsResponse);
       final currentUser = supabase.auth.currentUser;
-      Set<String> allUserPinnedPostIds = {}; // IDs of posts pinned to ANY of the user's boards
+      Set<String> allUserPinnedPostIds = {}; 
 
       if (currentUser != null) {
         final userId = currentUser.id;
-        // 1. Get all board_ids for the current user
         final userBoardsResponse = await supabase
             .from('pinboards')
             .select('id')
@@ -512,18 +512,15 @@ class SupabaseService {
               .map<String>((board) => board['id'] as String)
               .toList();
 
-          // 2. Get all post_ids from pinboard_posts that are on any of the user's boards
-          if (userBoardIds.isNotEmpty) {
-            final pinnedPostsResponse = await supabase
-                .from('pinboard_posts')
-                .select('post_id')
-                .inFilter('board_id', userBoardIds);
+          final pinnedPostsResponse = await supabase
+              .from('pinboard_posts')
+              .select('post_id')
+              .inFilter('board_id', userBoardIds);
             
-            allUserPinnedPostIds = pinnedPostsResponse
-                .map<String>((pin) => pin['post_id'] as String)
-                .toSet();
-            _logger.info('User $userId has ${allUserPinnedPostIds.length} unique posts pinned across all their boards.');
-          }
+          allUserPinnedPostIds = pinnedPostsResponse
+              .map<String>((pin) => pin['post_id'] as String)
+              .toSet();
+          _logger.info('User $userId has ${allUserPinnedPostIds.length} unique posts pinned across all their boards.');
         }
       } else {
         _logger.info('No user logged in. isBookmarked will be false for all posts.');
@@ -713,11 +710,9 @@ class SupabaseService {
     try {
       final response = await supabase
           .from('pinboards')
-          .select('id, name, cover_img_url') // Corrected from cover_image_url
+          .select('id, name, cover_img_url') 
           .eq('user_id', currentUser.id)
-          .order('created_at', ascending: true); // Or order by name, etc.
-
-      _logger.info('Raw response from Supabase for getUserPinboards: $response');
+          .order('created_at', ascending: true); 
 
       final pinboards = response
           .map((item) => PinboardInfo.fromJson(item))
@@ -737,26 +732,22 @@ class SupabaseService {
       _logger.warning('Cannot add post to pinboard: No user logged in.');
       return false;
     }
-    // We could also validate that the boardId belongs to the currentUser if necessary
-
     try {
-      // Check if already pinned to this board to avoid duplicates, or rely on DB constraints
       final existingPin = await supabase
           .from('pinboard_posts')
-          .select()
+          .select('post_id') 
           .eq('board_id', boardId)
           .eq('post_id', postId)
           .maybeSingle();
-
+      
       if (existingPin != null) {
         _logger.info('Post $postId is already pinned to board $boardId.');
-        return true; // Or false if we consider this a failed attempt to add anew
+        return true; 
       }
 
       await supabase.from('pinboard_posts').insert({
         'board_id': boardId,
         'post_id': postId,
-        // 'created_at': DateTime.now().toIso8601String(), // if pinboard_posts has created_at
       });
       _logger.info('Post $postId added to pinboard $boardId.');
       return true;
@@ -790,9 +781,6 @@ class SupabaseService {
 
   // Get all posts for a specific pinboard_id
   static Future<List<Post>> getPostsForPinboard(String boardId) async {
-    // No specific user check here, as boardId is the primary filter.
-    // However, UI should only allow users to fetch their own boards' posts.
-
     try {
       final pinboardPostsResponse = await supabase
           .from('pinboard_posts')
@@ -818,8 +806,7 @@ class SupabaseService {
 
       return postsData.map<Post>((postJson) {
         final enrichedJson = Map<String, dynamic>.from(postJson);
-        enrichedJson['is_bookmarked'] = true; // Posts from a specific board are considered 'bookmarked' to it
-        // isLiked and likesCount will come from the posts table as per schema
+        enrichedJson['is_bookmarked'] = true; 
         return Post.fromJson(enrichedJson);
       }).toList();
 
@@ -833,15 +820,12 @@ class SupabaseService {
   static Future<bool> isPostOnPinboard(String postId, String boardId) async {
     final currentUser = supabase.auth.currentUser;
     if (currentUser == null) {
-      // Or handle as an error, as this check is usually user-specific
       return false; 
     }
-    // We could also validate that boardId belongs to currentUser if needed
-
     try {
       final existingPin = await supabase
           .from('pinboard_posts')
-          .select('post_id') // select a minimal field
+          .select('post_id') 
           .eq('board_id', boardId)
           .eq('post_id', postId)
           .maybeSingle();
@@ -849,7 +833,7 @@ class SupabaseService {
       return existingPin != null;
     } catch (e) {
       _logger.severe('Error checking if post $postId is on pinboard $boardId: $e');
-      return false; // Default to false on error
+      return false; 
     }
   }
 
@@ -923,6 +907,50 @@ class SupabaseService {
     } catch (e) {
       _logger.severe('Error checking follow status: $e');
       return false;
+    }
+  }
+
+  static Future<String?> uploadPinboardCoverImage({
+    required String userId,
+    required Uint8List imageBytes,
+    required String fileName, 
+    String? mimeType,       
+  }) async {
+    const String storageBucket = 'pinboard_covers'; 
+    _logger.info('Attempting to upload cover image. Bucket: $storageBucket, User: $userId, Filename: $fileName, MimeType: $mimeType');
+
+    try {
+      String extension = 'jpg'; 
+      if (fileName.contains('.')) {
+        final parts = fileName.split('.');
+        if (parts.length > 1) {
+          extension = parts.last.toLowerCase();
+        }
+      }
+      
+      final uniqueFileNameWithExtension = '${const Uuid().v4()}.$extension';
+      final filePath = '$userId/$uniqueFileNameWithExtension'; 
+
+      _logger.info('Uploading to path: $filePath');
+
+      await supabase.storage.from(storageBucket).uploadBinary(
+            filePath,
+            imageBytes,
+            fileOptions: FileOptions(
+              contentType: mimeType ?? (extension == 'png' ? 'image/png' : 'image/jpeg'), 
+            ),
+          );
+      _logger.info('Binary upload successful for path: $filePath');
+
+      final publicUrl = supabase.storage.from(storageBucket).getPublicUrl(filePath);
+      _logger.info('Image successfully uploaded. Public URL: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      _logger.severe('Error uploading pinboard cover image to Supabase Storage: $e');
+      if (e is StorageException) {
+        _logger.severe('StorageException details: ${e.message}, statusCode: ${e.statusCode}, error: ${e.error}');
+      }
+      return null; 
     }
   }
 }
