@@ -50,6 +50,9 @@ class Post {
   final String? variation;
   final int? quantity;
   final double? price;
+  final int likesCount;
+  final bool isLiked;
+  final bool isBookmarked;
 
   Post({
     required this.id,
@@ -66,6 +69,9 @@ class Post {
     this.variation,
     this.quantity,
     this.price,
+    this.likesCount = 0,
+    this.isLiked = false,
+    this.isBookmarked = false,
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
@@ -87,6 +93,9 @@ class Post {
       variation: json['variation']?.toString(),
       quantity: json['quantity'] is int ? json['quantity'] : null,
       price: (json['price'] as num?)?.toDouble(),
+      likesCount: json['likecount'] as int? ?? 0,
+      isLiked: json['isLiked'] as bool? ?? false,
+      isBookmarked: json['is_bookmarked'] as bool? ?? false,
     );
   }
 }
@@ -125,6 +134,22 @@ class UserProfile {
         json['account_date_creation'] as String? ??
             DateTime.now().toIso8601String(),
       ),
+    );
+  }
+}
+
+class PinboardInfo {
+  final String id;
+  final String name;
+  final String? coverImageUrl;
+
+  PinboardInfo({required this.id, required this.name, this.coverImageUrl});
+
+  factory PinboardInfo.fromJson(Map<String, dynamic> json) {
+    return PinboardInfo(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      coverImageUrl: json['cover_img_url'] as String?, // Corrected from cover_image_url
     );
   }
 }
@@ -410,9 +435,9 @@ class SupabaseService {
       await supabase
           .from('pinboards') // Ensure 'pinboards' is your table name
           .insert({
-            'board_name': boardName,
-            'board_description': boardDescription,
-            'cover_img': coverImg, // Ensure column names match your DB schema
+            'name': boardName, // Changed from 'board_name'
+            'board_description': boardDescription, // This is stored but not currently fetched by PinboardInfo
+            'cover_img_url': coverImg, // Corrected from cover_image_url
             'user_id': userId, // Ensure column names match your DB schema
             'created_at': DateTime.now().toIso8601String(),
           });
@@ -465,13 +490,56 @@ class SupabaseService {
   // Get posts
   static Future<List<Post>> getPosts() async {
     try {
-      final response = await supabase
+      final allPostsResponse = await supabase
           .from('posts')
-          .select()
+          .select() 
           .order('created_at', ascending: false);
-      return response.map<Post>((post) => Post.fromJson(post)).toList();
+
+      final List<Map<String, dynamic>> allPostsData = List<Map<String, dynamic>>.from(allPostsResponse);
+      final currentUser = supabase.auth.currentUser;
+      Set<String> allUserPinnedPostIds = {}; // IDs of posts pinned to ANY of the user's boards
+
+      if (currentUser != null) {
+        final userId = currentUser.id;
+        // 1. Get all board_ids for the current user
+        final userBoardsResponse = await supabase
+            .from('pinboards')
+            .select('id')
+            .eq('user_id', userId);
+        
+        if (userBoardsResponse.isNotEmpty) {
+          final List<String> userBoardIds = userBoardsResponse
+              .map<String>((board) => board['id'] as String)
+              .toList();
+
+          // 2. Get all post_ids from pinboard_posts that are on any of the user's boards
+          if (userBoardIds.isNotEmpty) {
+            final pinnedPostsResponse = await supabase
+                .from('pinboard_posts')
+                .select('post_id')
+                .inFilter('board_id', userBoardIds);
+            
+            allUserPinnedPostIds = pinnedPostsResponse
+                .map<String>((pin) => pin['post_id'] as String)
+                .toSet();
+            _logger.info('User $userId has ${allUserPinnedPostIds.length} unique posts pinned across all their boards.');
+          }
+        }
+      } else {
+        _logger.info('No user logged in. isBookmarked will be false for all posts.');
+      }
+
+      return allPostsData.map<Post>((postJson) {
+        final String postId = postJson['id']?.toString() ?? '';
+        final bool isBookmarked = allUserPinnedPostIds.contains(postId);
+        
+        final Map<String, dynamic> enrichedPostJson = Map.from(postJson);
+        enrichedPostJson['is_bookmarked'] = isBookmarked;
+        return Post.fromJson(enrichedPostJson);
+      }).toList();
+
     } catch (e) {
-      _logger.severe('Error fetching posts: $e');
+      _logger.severe('Error fetching posts with multi-pinboard bookmark status: $e');
       return [];
     }
   }
@@ -630,6 +698,158 @@ class SupabaseService {
     } catch (e) {
       _logger.severe('Error uploading image to Supabase Storage: $e');
       rethrow;
+    }
+  }
+
+  // Get all pinboards (id and name) for the current user
+  static Future<List<PinboardInfo>> getUserPinboards() async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) {
+      _logger.warning('Cannot get user pinboards: No user logged in.');
+      return [];
+    }
+    _logger.info('Fetching pinboards for user ID: ${currentUser.id}');
+
+    try {
+      final response = await supabase
+          .from('pinboards')
+          .select('id, name, cover_img_url') // Corrected from cover_image_url
+          .eq('user_id', currentUser.id)
+          .order('created_at', ascending: true); // Or order by name, etc.
+
+      _logger.info('Raw response from Supabase for getUserPinboards: $response');
+
+      final pinboards = response
+          .map((item) => PinboardInfo.fromJson(item))
+          .toList();
+      _logger.info('Fetched ${pinboards.length} pinboards for user ${currentUser.id}');
+      return pinboards;
+    } catch (e) {
+      _logger.severe('Error fetching pinboards for user ${currentUser.id}: $e');
+      return [];
+    }
+  }
+
+  // Add a post to a specific pinboard
+  static Future<bool> addPostToPinboard(String postId, String boardId) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) {
+      _logger.warning('Cannot add post to pinboard: No user logged in.');
+      return false;
+    }
+    // We could also validate that the boardId belongs to the currentUser if necessary
+
+    try {
+      // Check if already pinned to this board to avoid duplicates, or rely on DB constraints
+      final existingPin = await supabase
+          .from('pinboard_posts')
+          .select()
+          .eq('board_id', boardId)
+          .eq('post_id', postId)
+          .maybeSingle();
+
+      if (existingPin != null) {
+        _logger.info('Post $postId is already pinned to board $boardId.');
+        return true; // Or false if we consider this a failed attempt to add anew
+      }
+
+      await supabase.from('pinboard_posts').insert({
+        'board_id': boardId,
+        'post_id': postId,
+        // 'created_at': DateTime.now().toIso8601String(), // if pinboard_posts has created_at
+      });
+      _logger.info('Post $postId added to pinboard $boardId.');
+      return true;
+    } catch (e) {
+      _logger.severe('Error adding post $postId to pinboard $boardId: $e');
+      return false;
+    }
+  }
+
+  // Remove a post from a specific pinboard
+  static Future<bool> removePostFromPinboard(String postId, String boardId) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) {
+      _logger.warning('Cannot remove post from pinboard: No user logged in.');
+      return false;
+    }
+
+    try {
+      await supabase
+          .from('pinboard_posts')
+          .delete()
+          .eq('board_id', boardId)
+          .eq('post_id', postId);
+      _logger.info('Post $postId removed from pinboard $boardId.');
+      return true;
+    } catch (e) {
+      _logger.severe('Error removing post $postId from pinboard $boardId: $e');
+      return false;
+    }
+  }
+
+  // Get all posts for a specific pinboard_id
+  static Future<List<Post>> getPostsForPinboard(String boardId) async {
+    // No specific user check here, as boardId is the primary filter.
+    // However, UI should only allow users to fetch their own boards' posts.
+
+    try {
+      final pinboardPostsResponse = await supabase
+          .from('pinboard_posts')
+          .select('post_id')
+          .eq('board_id', boardId);
+
+      if (pinboardPostsResponse.isEmpty) {
+        _logger.info('No posts found for pinboard $boardId.');
+        return [];
+      }
+
+      final List<String> postIds = pinboardPostsResponse
+          .map<String>((data) => data['post_id'] as String)
+          .toList();
+
+      if (postIds.isEmpty) return [];
+
+      final postsData = await supabase
+          .from('posts')
+          .select()
+          .inFilter('id', postIds)
+          .order('created_at', ascending: false);
+
+      return postsData.map<Post>((postJson) {
+        final enrichedJson = Map<String, dynamic>.from(postJson);
+        enrichedJson['is_bookmarked'] = true; // Posts from a specific board are considered 'bookmarked' to it
+        // isLiked and likesCount will come from the posts table as per schema
+        return Post.fromJson(enrichedJson);
+      }).toList();
+
+    } catch (e) {
+      _logger.severe('Error fetching posts for pinboard $boardId: $e');
+      return [];
+    }
+  }
+
+  // Check if a specific post is on a specific pinboard
+  static Future<bool> isPostOnPinboard(String postId, String boardId) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) {
+      // Or handle as an error, as this check is usually user-specific
+      return false; 
+    }
+    // We could also validate that boardId belongs to currentUser if needed
+
+    try {
+      final existingPin = await supabase
+          .from('pinboard_posts')
+          .select('post_id') // select a minimal field
+          .eq('board_id', boardId)
+          .eq('post_id', postId)
+          .maybeSingle();
+      
+      return existingPin != null;
+    } catch (e) {
+      _logger.severe('Error checking if post $postId is on pinboard $boardId: $e');
+      return false; // Default to false on error
     }
   }
 

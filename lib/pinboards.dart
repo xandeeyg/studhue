@@ -3,6 +3,7 @@ import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter/cupertino.dart';
 import 'supabase_service.dart';
 import 'pinboards_create_dialog.dart';
+import 'pinned_posts_screen.dart';
 
 class PinboardsScreen extends StatefulWidget {
   const PinboardsScreen({super.key});
@@ -14,14 +15,18 @@ class PinboardsScreen extends StatefulWidget {
 class _PinboardsScreenState extends State<PinboardsScreen> {
   // ... existing code ...
 
-  late Future<List<Map<String, String>>> _pinboardsFuture;
+  late Future<List<PinboardInfo>> _pinboardsFuture;
 
   @override
   void initState() {
     super.initState();
-    // Replace with actual token logic
-    const dummyToken = 'your_jwt_token_here';
-    _pinboardsFuture = SupabaseService.getPinboards(dummyToken);
+    _loadPinboards();
+  }
+
+  void _loadPinboards() {
+    setState(() {
+      _pinboardsFuture = SupabaseService.getUserPinboards();
+    });
   }
 
   @override
@@ -89,11 +94,7 @@ class _PinboardsScreenState extends State<PinboardsScreen> {
                           builder: (context) => const CreatePinboardDialog(),
                         );
                         if (result == true) {
-                          setState(() {
-                            // Replace with actual token logic if needed
-                            const dummyToken = 'your_jwt_token_here';
-                            _pinboardsFuture = SupabaseService.getPinboards(dummyToken);
-                          });
+                          _loadPinboards();
                         }
                       },
                     ),
@@ -106,59 +107,114 @@ class _PinboardsScreenState extends State<PinboardsScreen> {
 
             // Grid of Pinboards from API
             Expanded(
-              child: FutureBuilder<List<Map<String, String>>>(
+              child: FutureBuilder<List<PinboardInfo>>(
                 future: _pinboardsFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
+                    return const Center(child: CircularProgressIndicator(color: Color(0xFF5E4AD4)));
+                  }
+                  if (snapshot.hasError) {
                     return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('No pinboards found.'));
+                  }
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(child: Text('No pinboards yet. Create one!', style: TextStyle(fontSize: 16, color: Colors.grey)));
                   }
 
                   final pinboards = snapshot.data!;
                   return GridView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.all(16),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
-                      childAspectRatio: 1,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
+                      childAspectRatio: 0.8,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
                     ),
                     itemCount: pinboards.length,
                     itemBuilder: (context, index) {
                       final board = pinboards[index];
-                      return Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          image: DecorationImage(
-                            image: NetworkImage(board['coverImg']!),
-                            fit: BoxFit.cover,
+                      Widget coverImageWidget;
+                      if (board.coverImageUrl != null && board.coverImageUrl!.isNotEmpty) {
+                        coverImageWidget = Image.network(
+                          board.coverImageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey.shade300,
+                              child: const Center(
+                                child: Icon(LucideIcons.image_off, color: Colors.grey, size: 40),
+                              ),
+                            );
+                          },
+                          loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                    : null,
+                                color: Color(0xFF5E4AD4),
+                              ),
+                            );
+                          },
+                        );
+                      } else {
+                        coverImageWidget = Container(
+                          color: Colors.grey.shade200,
+                          child: Center(
+                            child: Icon(LucideIcons.image, size: 50, color: Colors.grey.shade400),
                           ),
-                        ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            gradient: LinearGradient(
-                              colors: [Colors.black.withAlpha((0.7 * 255).round()), Colors.transparent],
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                            ),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Align(
-                              alignment: Alignment.bottomLeft,
-                              child: Text(
-                                board['name']!,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
+                        );
+                      }
+
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PinnedPostsScreen(
+                                pinboardId: board.id,
+                                pinboardName: board.name,
                               ),
                             ),
+                          );
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Positioned.fill(
+                                child: coverImageWidget,
+                              ),
+                              Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [Colors.black.withOpacity(0.0), Colors.black.withOpacity(0.7)],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    stops: [0.5, 1.0],
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 8,
+                                left: 8,
+                                right: 8,
+                                child: Text(
+                                  board.name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    shadows: <Shadow>[
+                                      Shadow(offset: Offset(0.0, 1.0), blurRadius: 3.0, color: Colors.black54),
+                                    ]
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       );
