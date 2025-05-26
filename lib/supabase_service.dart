@@ -527,7 +527,7 @@ class SupabaseService {
         _logger.info('No user logged in. isBookmarked will be false for all posts.');
       }
 
-      return allPostsData.map<Post>((postJson) {
+      final List<Post> postsToReturn = allPostsData.map<Post>((postJson) {
         final String postId = postJson['id']?.toString() ?? '';
         final bool isBookmarked = allUserPinnedPostIds.contains(postId);
         
@@ -535,6 +535,13 @@ class SupabaseService {
         enrichedPostJson['is_bookmarked'] = isBookmarked;
         return Post.fromJson(enrichedPostJson);
       }).toList();
+
+    // ADDED LOGGING AND RETURN HERE
+    _logger.info('SupabaseService.getPosts: Returning ${postsToReturn.length} posts.');
+    for (var post in postsToReturn) {
+      _logger.info('SupabaseService.getPosts: Post ID: ${post.id}, Caption: ${post.caption.substring(0, (post.caption.length > 20 ? 20 : post.caption.length))}...');
+    }
+    return postsToReturn; // Crucial return statement
 
     } catch (e) {
       _logger.severe('Error fetching posts with multi-pinboard bookmark status: $e');
