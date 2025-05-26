@@ -12,19 +12,77 @@ class ArtVault extends StatefulWidget {
 
 class ArtVaultState extends State<ArtVault> {
   late Future<List<VaultItem>> _vaultItemsFuture;
-  // Keep quantity per item by index
-  final Map<int, int> quantities = {};
+  late Future<String?> _usernameFuture;
+  // Keep track of item quantities by their unique ID
+  final Map<String, int> quantities = {};
 
   @override
   void initState() {
     super.initState();
-    _vaultItemsFuture = SupabaseService.fetchVaultItems();
+    _loadData();
+  }
+  
+  Future<void> _loadData() async {
+    try {
+      final itemsFuture = SupabaseService.fetchVaultItems();
+      final usernameFuture = _getCurrentUsername();
+      
+      // Wait for both futures to complete
+      final results = await Future.wait([itemsFuture, usernameFuture]);
+      
+      if (mounted) {
+        setState(() {
+          _vaultItemsFuture = Future.value(results[0] as List<VaultItem>);
+          _usernameFuture = Future.value(results[1] as String?);
+        });
+      }
+    } catch (e) {
+      print('Error loading vault data: $e');
+      if (mounted) {
+        // Reinitialize with error state
+        setState(() {
+          _vaultItemsFuture = SupabaseService.fetchVaultItems();
+          _usernameFuture = _getCurrentUsername();
+        });
+      }
+    }
   }
 
-  void _onQuantityChanged(int index, int newQuantity) {
+  Future<String?> _getCurrentUsername() async {
+    try {
+      final currentUser = SupabaseService.supabase.auth.currentUser;
+      if (currentUser == null) return null;
+      
+      final userData = await SupabaseService.supabase
+          .from('users')
+          .select('username')
+          .eq('user_id', currentUser.id)
+          .single();
+          
+      return userData['username'] as String?;
+    } catch (e) {
+      print('Error getting username: $e');
+      return null;
+    }
+  }
+
+  Future<void> _onQuantityChanged(String itemId, int newQuantity) async {
+    if (newQuantity < 1) return; // Don't allow quantities less than 1
+    
     setState(() {
-      quantities[index] = newQuantity;
+      quantities[itemId] = newQuantity;
     });
+    
+    // Update quantity in the database
+    final success = await SupabaseService.updateVaultItemQuantity(itemId, newQuantity);
+    if (!success) {
+      // Revert the UI change if the update fails
+      if (mounted) {
+        setState(() {
+          quantities.remove(itemId);
+        });
+      }
+    }
   }
 
   @override
@@ -32,10 +90,38 @@ class ArtVaultState extends State<ArtVault> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xff14c1e1),
         elevation: 0,
-        title: const TopBar(),
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 24),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Art Vault',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Inter-Bold',
+          ),
+        ),
+        centerTitle: true,
+        actions: [
+          TextButton(
+            onPressed: () {
+              // Add edit functionality here
+            },
+            child: const Text(
+              'Edit',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 16,
+                fontFamily: 'Inter-Regular',
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: FutureBuilder<List<VaultItem>>(
         future: _vaultItemsFuture,
@@ -49,82 +135,87 @@ class ArtVaultState extends State<ArtVault> {
           }
 
           final items = snapshot.data!;
-          return SingleChildScrollView(
-            child: Column(
-              children: List.generate(items.length, (index) {
-                final item = items[index];
-                final quantity = quantities[index] ?? item.quantity;
+          return FutureBuilder<String?>(
+            future: _usernameFuture,
+            builder: (context, usernameSnapshot) {
+              if (usernameSnapshot.connectionState != ConnectionState.done) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              
+              final username = usernameSnapshot.hasData ? usernameSnapshot.data! : 'User';
+              
+              return SingleChildScrollView(
+                child: Column(
+                  children: List.generate(items.length, (index) {
+                    final item = items[index];
+                    // Create a unique key for the item
+                    final itemId = '${item.userId}_${item.productName}_${item.variation ?? ''}';
+                    // Use the quantity from our local state if available, otherwise use the item's quantity
+                    final quantity = quantities[itemId] ?? item.quantity;
 
-                return _buildCart(
-                  username: item.username,
-                  productname: item.productname,
-                  variation: item.variation,
-                  quantity: quantity,
-                  price: item.price,
-                  iconPath: item.iconUrl, // Assuming this is a network URL
-                  imagePath: item.imageUrl, // Assuming this is a network URL
-                  onQuantityChanged: (newQty) => _onQuantityChanged(index, newQty),
-                  useNetworkImages: true,
-                );
-              }),
-            ),
+                    return _buildCart(
+                      username: username,
+                      productname: item.productName,
+                      variation: item.variation ?? '',
+                      quantity: quantity,
+                      price: item.price,
+                      iconPath: item.iconUrl,
+                      imagePath: item.imageUrl,
+                      onQuantityChanged: (newQty) => _onQuantityChanged(itemId, newQty),
+                      useNetworkImages: true,
+                    );
+                  }),
+                ),
+              );
+            },
           );
         },
       ),
-      bottomNavigationBar: Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              height: 60,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha((0.5 * 255).round()),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.home),
-                    onPressed: () {
-                      Navigator.pushNamed(context, "/home");
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.pin),
-                    onPressed: () {
-                      Navigator.pushNamed(context, "/pinboards");
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.add_box_outlined),
-                    onPressed: () {
-                      Navigator.pushNamed(context, "/createpost");
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(LucideIcons.vault),
-                    color: const Color.fromRGBO(20, 193, 225, 100),
-                    onPressed: () {
-                      Navigator.pushNamed(context, "/vault");
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.person_outline),
-                    onPressed: () {
-                      Navigator.pushNamed(context, "/profile");
-                    },
-                  ),
-                ],
-              ),
+      bottomNavigationBar: Container(
+        height: 60,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
             ),
-          ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.home_outlined, size: 28),
+              onPressed: () => Navigator.pushNamed(context, "/home"),
+            ),
+            IconButton(
+              icon: const Icon(CupertinoIcons.pin, size: 28),
+              onPressed: () => Navigator.pushNamed(context, "/pinboards"),
+            ),
+            IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(
+                  color: Color(0xff14c1e1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 24),
+              ),
+              onPressed: () => Navigator.pushNamed(context, "/createpost"),
+            ),
+            IconButton(
+              icon: const Icon(LucideIcons.vault, size: 28, color: Color(0xff14c1e1)),
+              onPressed: () => Navigator.pushReplacementNamed(context, "/vault"),
+            ),
+            IconButton(
+              icon: const Icon(Icons.person_outline, size: 28),
+              onPressed: () => Navigator.pushNamed(context, "/profile"),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -327,75 +418,6 @@ class QuantitySelector extends StatelessWidget {
                 width: 17,
                 height: 17,
                 child: Icon(Icons.add, size: 14),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class TopBar extends StatelessWidget {
-  const TopBar({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xff14c1e1),
-      child: SizedBox(
-        width: double.infinity,
-        height: 76,
-        child: Stack(
-          children: [
-            Positioned(
-              left: 0,
-              width: double.infinity,
-              top: 0,
-              height: 76,
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xff14c1e1),
-                ),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: 15,
-                      left: 0,
-                      child: IconButton(
-                        icon: const Icon(Icons.arrow_back_rounded, size: 30),
-                        onPressed: () {
-                          Navigator.pushNamed(context, "/homescreen");
-                        },
-                      ),
-                    ),
-                    const Positioned(
-                      left: 39,
-                      top: 27,
-                      child: Text(
-                        'Art Vault',
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: Color(0xff000000),
-                          fontFamily: 'Inter-Bold',
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const Positioned(
-                      left: 330,
-                      top: 30,
-                      child: Text(
-                        'Edit',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Color(0xff000000),
-                          fontFamily: 'Inter-Regular',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ],

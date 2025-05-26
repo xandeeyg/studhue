@@ -518,21 +518,101 @@ class HomeScreenState extends State<HomeScreen> {
                 if (post.isProduct &&
                     post.productname != null &&
                     post.productname!.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.blue),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'SHOP NOW',
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                  Row(
+                    children: [
+                      // Existing SHOP NOW button
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.blue),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'SHOP NOW',
+                          style: TextStyle(
+                            color: Colors.blue,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8), // Add some spacing between buttons
+                      // Add to Cart button
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final currentUser = SupabaseService.supabase.auth.currentUser;
+                          if (currentUser == null) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please sign in to add items to cart')),
+                              );
+                            }
+                            return;
+                          }
+                          
+                          try {
+                            // Add to cart
+                            final cartSuccess = await SupabaseService.addToCart(
+                              currentUser.id,
+                              post.id,
+                              post.productname!,
+                              post.variation,
+                              post.price ?? 0.0,
+                              post.postImagePath,
+                            );
+
+                            // Also add to vault
+                            if (cartSuccess) {
+                              await SupabaseService.addToVault(
+                                username: post.username,
+                                productname: post.productname!,
+                                variation: post.variation ?? '',
+                                quantity: 1, // Default quantity
+                                price: post.price ?? 0.0,
+                                iconUrl: post.iconPath,
+                                imageUrl: post.postImagePath,
+                              );
+                            }
+                            
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    cartSuccess 
+                                      ? 'Added to cart and vault!' 
+                                      : 'Failed to add to cart. Please try again.',
+                                  ),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Error adding to vault. Please try again.'),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF5E4AD4), // Theme color
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        icon: const Icon(Icons.shopping_cart, size: 16),
+                        label: const Text(
+                          'ADD TO CART',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 const Spacer(),
                 IconButton(

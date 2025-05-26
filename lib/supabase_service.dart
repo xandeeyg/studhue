@@ -8,33 +8,36 @@ import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class VaultItem {
-  final String username;
-  final String productname;
+  final String userId;
+  final String productName;
   final String variation;
   final int quantity;
   final double price;
-  final String iconUrl;
-  final String imageUrl;
+  final String iconUrl;  // This corresponds to 'icon_url' in the database
+  final String imageUrl; // This corresponds to 'image_url' in the database
+  final String? postId;
 
   VaultItem({
-    required this.username,
-    required this.productname,
+    required this.userId,
+    required this.productName,
     required this.variation,
     required this.quantity,
     required this.price,
     required this.iconUrl,
     required this.imageUrl,
+    this.postId,
   });
 
   factory VaultItem.fromJson(Map<String, dynamic> json) {
     return VaultItem(
-      username: json['username'] as String,
-      productname: json['productname'] as String,
-      variation: json['variation'] as String,
-      quantity: json['quantity'] as int,
+      userId: json['user_id'] as String,
+      productName: json['product_name'] as String,
+      variation: json['variation'] as String? ?? '',
+      quantity: (json['quantity'] as num).toInt(),
       price: (json['price'] as num).toDouble(),
-      iconUrl: json['icon_url'] as String,
-      imageUrl: json['image_url'] as String,
+      iconUrl: json['icon_url'] as String,  // Matches database column
+      imageUrl: json['image_url'] as String, // Matches database column
+      postId: json['post_id'] as String?,
     );
   }
 }
@@ -463,7 +466,7 @@ class SupabaseService {
     try {
       await supabase.from('vault_items').insert({
         'username': username,
-        'productname': productname,
+        'product_name': productname,  // Changed from 'productname' to 'product_name'
         'variation': variation,
         'quantity': quantity,
         'price': price,
@@ -573,16 +576,54 @@ class SupabaseService {
   // Fetch vault items
   static Future<List<VaultItem>> fetchVaultItems() async {
     try {
+      _logger.info('Fetching vault items...');
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) {
+        _logger.warning('Cannot fetch vault items: No user is logged in');
+        return [];
+      }
+      
+      _logger.info('Fetching items for user: ${currentUser.id}');
+      
+      // First, let's verify the table structure
+      try {
+        final tableInfo = await supabase
+            .from('vault_items')
+            .select('*')
+            .limit(1);
+        _logger.info('Table structure sample: $tableInfo');
+      } catch (e) {
+        _logger.warning('Could not get table structure: $e');
+      }
+      
+      // Fetch the vault items for this user using their user_id
       final response = await supabase
           .from('vault_items')
           .select()
+          .eq('user_id', currentUser.id)
           .order('created_at', ascending: false);
-      return response
-          .map<VaultItem>((item) => VaultItem.fromJson(item))
+          
+      _logger.info('Fetched ${response.length} items from vault');
+      
+      final items = response
+          .map<VaultItem>((item) {
+            try {
+              return VaultItem.fromJson(item);
+            } catch (e) {
+              _logger.severe('Error parsing vault item $item: $e');
+              rethrow;
+            }
+          })
           .toList();
+          
+      _logger.info('Successfully parsed ${items.length} vault items');
+      return items;
     } catch (e) {
       _logger.severe('Error fetching vault items: $e');
-      return [];
+      if (e is PostgrestException) {
+        _logger.severe('Postgrest error details: ${e.message}');
+      }
+      rethrow;
     }
   }
 
@@ -959,6 +1000,104 @@ class SupabaseService {
         _logger.severe('StorageException details: ${e.message}, statusCode: ${e.statusCode}, error: ${e.error}');
       }
       return null; 
+    }
+  }
+
+  static Future<bool> updateVaultItemQuantity(String itemId, int newQuantity) async {
+    try {
+      await supabase
+          .from('vault_items')
+          .update({
+            'quantity': newQuantity,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', itemId);
+      return true;
+    } catch (e) {
+      _logger.severe('Error updating vault item quantity: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> addToCart(String userId, String postId, String productName, String? variation, double price, String imageUrl, {int quantity = 1}) async {
+    try {
+      _logger.info('Attempting to add to cart - User: $userId, Product: $productName, Variation: $variation');
+      
+      // Ensure variation is not null
+      final variationValue = variation ?? '';
+      
+      // Check if item already exists in vault for this user
+      _logger.info('Checking for existing item in vault...');
+      final existingItem = await supabase
+          .from('vault_items')
+          .select()
+          .eq('user_id', userId)
+          .eq('product_name', productName)
+          .eq('variation', variationValue)
+          .maybeSingle();
+      
+      _logger.info('Existing item check complete. Found: ${existingItem != null}');
+          
+      if (existingItem != null) {
+        // Update quantity if item exists
+        _logger.info('Updating existing item quantity. Current quantity: ${existingItem['quantity']}');
+        final newQuantity = (existingItem['quantity'] as int) + quantity;
+        await supabase
+            .from('vault_items')
+            .update({
+              'quantity': newQuantity,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', existingItem['id']);
+        _logger.info('Successfully updated quantity to $newQuantity');
+      } else {
+        // Add new item to vault
+        _logger.info('Adding new item to vault...');
+        final newItem = {
+          'user_id': userId,
+          'post_id': postId,
+          'product_name': productName,
+          'variation': variationValue,
+          'quantity': quantity,
+          'price': price,
+          'icon_url': imageUrl,  // Using the same image for icon and main image
+          'image_url': imageUrl,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+        _logger.info('Item data to insert: $newItem');
+        
+        final response = await supabase
+            .from('vault_items')
+            .insert(newItem)
+            .select();
+            
+        _logger.info('Insert response: $response');
+        _logger.info('Successfully added new item to vault');
+      }
+      
+      // Verify the item was added/updated
+      final verifyItem = await supabase
+          .from('vault_items')
+          .select()
+          .eq('user_id', userId)
+          .eq('product_name', productName)
+          .eq('variation', variationValue)
+          .maybeSingle();
+          
+      _logger.info('Verification - Item in database: ${verifyItem != null}');
+      
+      if (verifyItem == null) {
+        throw Exception('Failed to verify item was added to vault');
+      }
+      
+      return true;
+    } catch (e) {
+      _logger.severe('Error adding item to vault: $e');
+      if (e is PostgrestException) {
+        _logger.severe('Postgrest error details: ${e.message}');
+      }
+      rethrow; // Rethrow to see the full error in the UI
     }
   }
 
