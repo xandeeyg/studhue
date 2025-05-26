@@ -83,6 +83,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _createPost() async {
+    if (_isLoading) return; // Prevent double submission
+
     final user = SupabaseService.supabase.auth.currentUser;
     if (user == null) {
       _showErrorSnackBar('User not logged in');
@@ -174,9 +176,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 : null,
       };
 
-      // Insert post with all fields
-      await SupabaseService.supabase.from('posts').insert(postData);
-
       await SupabaseService.createPost(
         userId: user.id,
         caption: caption,
@@ -234,8 +233,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
               )
               : TextButton(
-                onPressed: _createPost,
-                child: const Text('Post', style: TextStyle(color: Colors.blue)),
+                onPressed: _isLoading ? null : _createPost,
+                child: _isLoading
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Post', style: TextStyle(color: Colors.blue)),
               ),
         ],
       ),
