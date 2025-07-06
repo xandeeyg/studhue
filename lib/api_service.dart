@@ -265,7 +265,7 @@ class ApiService {
         caption: 'Check out my latest design!',
         postType: 'regular',
         postDate: DateTime.now(),
-        imageUrl: 'graphics/Background.png',
+        // imageUrl: 'graphics/Background.png',
         username: 'johndoe',
         profilePicture: 'graphics/Profile Icon.png',
         userProfession: 'Graphic Designer',

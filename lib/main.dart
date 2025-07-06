@@ -13,9 +13,12 @@ import 'supabase_service.dart';
 import 'package:logging/logging.dart';
 import 'createpost_screen.dart';
 import 'edit_profile_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
     if (record.level.value >= Logger.root.level.value) {

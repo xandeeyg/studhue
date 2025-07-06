@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "13729789814",
+    "project_id": "studhue-dc25e",
+    "storage_bucket": "studhue-dc25e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:13729789814:android:f492575ac8af19002c6c57",
+        "android_client_info": {
+          "package_name": "com.example.my_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJyK2Hv_csQtSokkv5YU6ePh8NRXRuc2E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
