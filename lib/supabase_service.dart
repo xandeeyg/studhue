@@ -97,7 +97,7 @@ class Post {
           json['created_at'] != null
               ? DateTime.parse(json['created_at'])
               : DateTime.now(),
-      isProduct: json['is_product'] is bool ? json['is_product'] : false,
+      isProduct: (json['is_product'] == true || json['is_product'] == 1 || json['is_product'] == 't' || json['is_product'] == 'true'),
       productname: json['productname']?.toString(),
       variation: json['variation']?.toString(),
       quantity: json['quantity'] is int ? json['quantity'] : null,
@@ -412,6 +412,10 @@ class SupabaseService {
     required String postType,
     required String imageUrl,
     bool isProduct = false,
+    String? productName,
+    String? variation,
+    int? quantity,
+    double? price,
   }) async {
     try {
       final userProfileResponse =
@@ -431,10 +435,10 @@ class SupabaseService {
         'icon_path':
             userProfileResponse['profile_picture'] ??
             'graphics/Profile Icon.png',
-        'productname': null,
-        'variation': null,
-        'quantity': null,
-        'price': null,
+        'productname': productName,
+        'variation': variation,
+        'quantity': quantity,
+        'price': price,
       };
       final response =
           await supabase.from('posts').insert(postData).select('id').single();

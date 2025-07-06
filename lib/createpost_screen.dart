@@ -182,6 +182,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         postType: postType,
         imageUrl: imageUrl,
         isProduct: _postType == PostType.product,
+        productName: _postType == PostType.product ? _titleController.text : null,
+        variation: _postType == PostType.product ? _variationController.text : null,
+        quantity: _postType == PostType.product ? int.tryParse(_quantityController.text) : null,
+        price: _postType == PostType.product ? double.tryParse(_priceController.text) : null,
       );
 
       _logger.info('Post created successfully');
