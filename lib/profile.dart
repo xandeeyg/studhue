@@ -25,7 +25,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         isLoading = true;
       });
 
-      print('DEBUG: Attempting to fetch current user profile using SupabaseService.getUserProfile');
+      print(
+        'DEBUG: Attempting to fetch current user profile using SupabaseService.getUserProfile',
+      );
 
       final fetchedProfileData = await SupabaseService.getUserProfile();
 
@@ -40,44 +42,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
               profileData = {
                 'username': username,
                 'profile_picture': 'graphics/Profile Icon.png', // Default icon
-                'post_count': 0, 
-                'followers': 0, 
+                'post_count': 0,
+                'followers': 0,
                 'following': 0,
               };
-              userPosts = []; 
+              userPosts = [];
               isLoading = false;
             });
-            print('DEBUG: Using fallback profile data from SharedPreferences for username: $username');
+            print(
+              'DEBUG: Using fallback profile data from SharedPreferences for username: $username',
+            );
           } else {
-            throw Exception('No user data found and no username in SharedPreferences');
+            throw Exception(
+              'No user data found and no username in SharedPreferences',
+            );
           }
         } catch (e) {
           print('DEBUG: Error in fallback or no fallback available: $e');
           setState(() {
             isLoading = false;
             // Optionally, set profileData to an error state or leave it null
-            profileData = null; 
+            profileData = null;
             userPosts = [];
           });
         }
         return; // Exit if profile data couldn't be fetched
       }
 
-      print('DEBUG: Fetched user data via SupabaseService: $fetchedProfileData');
+      print(
+        'DEBUG: Fetched user data via SupabaseService: $fetchedProfileData',
+      );
 
       // Fetch this user's posts
       // Ensure 'user_id' is present in fetchedProfileData before using it.
-      final userId = fetchedProfileData['user_id'] ?? fetchedProfileData['id']; 
+      final userId = fetchedProfileData['user_id'] ?? fetchedProfileData['id'];
       // The key might be 'id' or 'user_id' depending on how SupabaseService.getUserProfile structures it after combining results.
       // It's safer to check both or standardize in SupabaseService.
       // For now, assuming 'user_id' is the primary key from the 'users' table part of the response.
 
       if (userId == null) {
-        print('DEBUG: User ID is null in fetchedProfileData. Cannot fetch posts.');
+        print(
+          'DEBUG: User ID is null in fetchedProfileData. Cannot fetch posts.',
+        );
         setState(() {
-            profileData = fetchedProfileData;
-            userPosts = [];
-            isLoading = false;
+          profileData = fetchedProfileData;
+          userPosts = [];
+          isLoading = false;
         });
         return;
       }
@@ -93,13 +103,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         setState(() {
           profileData = fetchedProfileData; // This already contains the counts
-          userPosts = List<Map<String, dynamic>>.from(posts ?? []);
+          userPosts = List<Map<String, dynamic>>.from(posts);
           isLoading = false;
         });
       } catch (postsError) {
         print('DEBUG: Error fetching posts: $postsError');
         setState(() {
-          profileData = fetchedProfileData; // Still set profileData, even if posts fail
+          profileData =
+              fetchedProfileData; // Still set profileData, even if posts fail
           userPosts = [];
           isLoading = false;
         });
@@ -109,7 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         isLoading = false;
         // Optionally, set profileData to an error state or leave it null
-        profileData = null; 
+        profileData = null;
         userPosts = [];
       });
     }
@@ -228,14 +239,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         actions: <Widget>[
                           Builder(
-                            builder: (BuildContext menuContext) { // Use this new context for the SnackBar
+                            builder: (BuildContext menuContext) {
+                              // Use this new context for the SnackBar
                               return PopupMenuButton<String>(
-                                icon: const Icon(Icons.menu, color: Colors.black),
+                                icon: const Icon(
+                                  Icons.menu,
+                                  color: Colors.black,
+                                ),
                                 onSelected: (String result) async {
                                   switch (result) {
                                     case 'editProfile':
-                                      print('Edit Profile selected (from Builder context)');
-                                      Navigator.pushNamed(menuContext, '/edit_profile');
+                                      print(
+                                        'Edit Profile selected (from Builder context)',
+                                      );
+                                      Navigator.pushNamed(
+                                        menuContext,
+                                        '/edit_profile',
+                                      );
                                       break;
                                     case 'logout':
                                       print('Logout selected');
@@ -243,31 +263,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         await SupabaseService.signOutUser();
                                         if (mounted) {
                                           // Navigate to the login screen and clear navigation stack
-                                          Navigator.of(menuContext).pushNamedAndRemoveUntil('/log', (Route<dynamic> route) => false);
+                                          Navigator.of(
+                                            menuContext,
+                                          ).pushNamedAndRemoveUntil(
+                                            '/log',
+                                            (Route<dynamic> route) => false,
+                                          );
                                         }
                                       } catch (e) {
                                         print('Error during logout: $e');
                                         if (mounted) {
-                                          ScaffoldMessenger.of(menuContext).showSnackBar( // menuContext here
-                                            SnackBar(content: Text('Logout failed: $e')),
+                                          ScaffoldMessenger.of(
+                                            menuContext,
+                                          ).showSnackBar(
+                                            // menuContext here
+                                            SnackBar(
+                                              content: Text(
+                                                'Logout failed: $e',
+                                              ),
+                                            ),
                                           );
                                         }
                                       }
                                       break;
                                   }
                                 },
-                                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                                  const PopupMenuItem<String>(
-                                    value: 'editProfile',
-                                    child: Text('Edit Profile'),
-                                  ),
-                                  const PopupMenuItem<String>(
-                                    value: 'logout',
-                                    child: Text('Logout'),
-                                  ),
-                                ],
+                                itemBuilder:
+                                    (BuildContext context) =>
+                                        <PopupMenuEntry<String>>[
+                                          const PopupMenuItem<String>(
+                                            value: 'editProfile',
+                                            child: Text('Edit Profile'),
+                                          ),
+                                          const PopupMenuItem<String>(
+                                            value: 'logout',
+                                            child: Text('Logout'),
+                                          ),
+                                        ],
                               );
-                            }
+                            },
                           ),
                         ],
                       ),
@@ -418,8 +452,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                     child,
                                                     loadingProgress,
                                                   ) {
-                                                    if (loadingProgress == null)
+                                                    if (loadingProgress ==
+                                                        null) {
                                                       return child;
+                                                    }
                                                     return Center(
                                                       child: CircularProgressIndicator(
                                                         value:
@@ -468,12 +504,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         // Bottom Navigation
         bottomNavigationBar: Container(
-          height: 60,
+          height: 55,
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withAlpha((0.5 * 255).round()),
+                color: Colors.black.withOpacity(0.1),
                 blurRadius: 10,
                 offset: const Offset(0, -2),
               ),
@@ -483,29 +519,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               IconButton(
-                icon: const Icon(Icons.home),
+                icon: const Icon(Icons.home, size: 28),
                 onPressed: () {
                   Navigator.pushNamed(context, "/home");
                 },
               ),
               IconButton(
-                icon: const Icon(CupertinoIcons.pin),
+                icon: const Icon(CupertinoIcons.pin, size: 24),
                 onPressed: () {
                   Navigator.pushNamed(context, "/pinboards");
                 },
               ),
               IconButton(
-                icon: const Icon(Icons.add_box_outlined),
-                onPressed: () {},
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: Color(0xff14c1e1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.add, color: Colors.white, size: 24),
+                ),
+                onPressed: () => Navigator.pushNamed(context, "/createpost"),
               ),
               IconButton(
-                icon: const Icon(LucideIcons.vault),
+                icon: const Icon(LucideIcons.vault, size: 25),
                 onPressed: () {
                   Navigator.pushNamed(context, "/vault");
                 },
               ),
               IconButton(
-                icon: const Icon(Icons.person),
+                icon: const Icon(Icons.person_outline, size: 28),
                 color: const Color.fromRGBO(20, 193, 225, 100),
                 onPressed: () {
                   Navigator.pushNamed(context, "/profile");

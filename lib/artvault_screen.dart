@@ -21,15 +21,15 @@ class ArtVaultState extends State<ArtVault> {
     super.initState();
     _loadData();
   }
-  
+
   Future<void> _loadData() async {
     try {
       final itemsFuture = SupabaseService.fetchVaultItems();
       final usernameFuture = _getCurrentUsername();
-      
+
       // Wait for both futures to complete
       final results = await Future.wait([itemsFuture, usernameFuture]);
-      
+
       if (mounted) {
         setState(() {
           _vaultItemsFuture = Future.value(results[0] as List<VaultItem>);
@@ -52,13 +52,14 @@ class ArtVaultState extends State<ArtVault> {
     try {
       final currentUser = SupabaseService.supabase.auth.currentUser;
       if (currentUser == null) return null;
-      
-      final userData = await SupabaseService.supabase
-          .from('users')
-          .select('username')
-          .eq('user_id', currentUser.id)
-          .single();
-          
+
+      final userData =
+          await SupabaseService.supabase
+              .from('users')
+              .select('username')
+              .eq('user_id', currentUser.id)
+              .single();
+
       return userData['username'] as String?;
     } catch (e) {
       print('Error getting username: $e');
@@ -68,13 +69,16 @@ class ArtVaultState extends State<ArtVault> {
 
   Future<void> _onQuantityChanged(String itemId, int newQuantity) async {
     if (newQuantity < 1) return; // Don't allow quantities less than 1
-    
+
     setState(() {
       quantities[itemId] = newQuantity;
     });
-    
+
     // Update quantity in the database
-    final success = await SupabaseService.updateVaultItemQuantity(itemId, newQuantity);
+    final success = await SupabaseService.updateVaultItemQuantity(
+      itemId,
+      newQuantity,
+    );
     if (!success) {
       // Revert the UI change if the update fails
       if (mounted) {
@@ -141,27 +145,30 @@ class ArtVaultState extends State<ArtVault> {
               if (usernameSnapshot.connectionState != ConnectionState.done) {
                 return const Center(child: CircularProgressIndicator());
               }
-              
-              final username = usernameSnapshot.hasData ? usernameSnapshot.data! : 'User';
-              
+
+              final username =
+                  usernameSnapshot.hasData ? usernameSnapshot.data! : 'User';
+
               return SingleChildScrollView(
                 child: Column(
                   children: List.generate(items.length, (index) {
                     final item = items[index];
                     // Create a unique key for the item
-                    final itemId = '${item.userId}_${item.productName}_${item.variation ?? ''}';
+                    final itemId =
+                        '${item.userId}_${item.productName}_${item.variation}';
                     // Use the quantity from our local state if available, otherwise use the item's quantity
                     final quantity = quantities[itemId] ?? item.quantity;
 
                     return _buildCart(
                       username: username,
                       productname: item.productName,
-                      variation: item.variation ?? '',
+                      variation: item.variation,
                       quantity: quantity,
                       price: item.price,
                       iconPath: item.iconUrl,
                       imagePath: item.imageUrl,
-                      onQuantityChanged: (newQty) => _onQuantityChanged(itemId, newQty),
+                      onQuantityChanged:
+                          (newQty) => _onQuantityChanged(itemId, newQty),
                       useNetworkImages: true,
                     );
                   }),
@@ -172,7 +179,7 @@ class ArtVaultState extends State<ArtVault> {
         },
       ),
       bottomNavigationBar: Container(
-        height: 60,
+        height: 55,
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -191,7 +198,7 @@ class ArtVaultState extends State<ArtVault> {
               onPressed: () => Navigator.pushNamed(context, "/home"),
             ),
             IconButton(
-              icon: const Icon(CupertinoIcons.pin, size: 28),
+              icon: const Icon(CupertinoIcons.pin, size: 24),
               onPressed: () => Navigator.pushNamed(context, "/pinboards"),
             ),
             IconButton(
@@ -206,8 +213,13 @@ class ArtVaultState extends State<ArtVault> {
               onPressed: () => Navigator.pushNamed(context, "/createpost"),
             ),
             IconButton(
-              icon: const Icon(LucideIcons.vault, size: 28, color: Color(0xff14c1e1)),
-              onPressed: () => Navigator.pushReplacementNamed(context, "/vault"),
+              icon: const Icon(
+                LucideIcons.vault,
+                size: 25,
+                color: Color(0xff14c1e1),
+              ),
+              onPressed:
+                  () => Navigator.pushReplacementNamed(context, "/vault"),
             ),
             IconButton(
               icon: const Icon(Icons.person_outline, size: 28),
@@ -248,9 +260,10 @@ Widget _buildCart({
                   const SizedBox(width: 15),
                   CircleAvatar(
                     radius: 13,
-                    backgroundImage: useNetworkImages
-                        ? NetworkImage(iconPath)
-                        : AssetImage(iconPath) as ImageProvider,
+                    backgroundImage:
+                        useNetworkImages
+                            ? NetworkImage(iconPath)
+                            : AssetImage(iconPath) as ImageProvider,
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -263,8 +276,11 @@ Widget _buildCart({
                     ),
                   ),
                   const SizedBox(width: 5),
-                  const Icon(Icons.arrow_forward_ios_rounded,
-                      size: 14, color: Color(0xffea1a7f)),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color: Color(0xffea1a7f),
+                  ),
                 ],
               ),
             ),
@@ -301,7 +317,10 @@ Widget _buildCart({
                     width: 17,
                     height: 17,
                     decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xffbdbec0), width: 1),
+                      border: Border.all(
+                        color: const Color(0xffbdbec0),
+                        width: 1,
+                      ),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -311,19 +330,20 @@ Widget _buildCart({
                   top: 7,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(5),
-                    child: useNetworkImages
-                        ? Image.network(
-                            imagePath,
-                            width: 65,
-                            height: 66.182,
-                            fit: BoxFit.cover,
-                          )
-                        : Image.asset(
-                            imagePath,
-                            width: 65,
-                            height: 66.182,
-                            fit: BoxFit.cover,
-                          ),
+                    child:
+                        useNetworkImages
+                            ? Image.network(
+                              imagePath,
+                              width: 65,
+                              height: 66.182,
+                              fit: BoxFit.cover,
+                            )
+                            : Image.asset(
+                              imagePath,
+                              width: 65,
+                              height: 66.182,
+                              fit: BoxFit.cover,
+                            ),
                   ),
                 ),
                 Positioned(
