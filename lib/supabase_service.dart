@@ -43,6 +43,13 @@ class VaultItem {
 }
 
 class Post {
+  static String _resolveAvatarUrl(String raw) {
+    if (raw.isEmpty) return '';
+    if (raw.startsWith('http')) return raw;
+    // Assume stored in "avatars" bucket if not absolute URL
+    return SupabaseService.supabase.storage.from('avatars').getPublicUrl(raw);
+  }
+
   final String id;
   final String username;
   final String profession;
@@ -89,7 +96,7 @@ class Post {
       isVerified: json['is_verified'] is bool ? json['is_verified'] : false,
       verifiedOffset: (json['verified_offset'] as num?)?.toDouble() ?? 4.0,
       postImagePath: json['post_image_path']?.toString() ?? '',
-      iconPath: json['icon_path']?.toString() ?? '',
+      iconPath: _resolveAvatarUrl(json['icon_path']?.toString() ?? ''),
       caption: json['caption']?.toString() ?? '',
       postDate:
           json['created_at'] != null
@@ -1243,16 +1250,18 @@ class SupabaseService {
         return true; // Return success as the intended state is achieved
       }
 
-      // Start a transaction
-      _logger.info('Calling RPC function "like_post" with params: {"post_id": "$postId", "user_id": "${user.id}"}');
-      await supabase.rpc(
-        'like_post',
-        params: {
-          'post_id': postId,
-          'user_id': user.id,
-        },
+      _logger.info('Inserting like into post_likes');
+      await supabase.from('post_likes').upsert(
+        [
+          {
+            'post_id': postId,
+            'user_id': user.id,
+          }
+        ],
+        onConflict: 'post_id,user_id',
+        ignoreDuplicates: true,
       );
-      _logger.info('RPC function "like_post" executed successfully');
+      _logger.info('Like inserted successfully');
 
       return true;
     } catch (e) {
@@ -1266,16 +1275,13 @@ class SupabaseService {
       final user = supabase.auth.currentUser;
       if (user == null) throw Exception("Not logged in");
 
-      // Start a transaction
-      _logger.info('Calling RPC function "unlike_post" with params: {"post_id": "$postId", "user_id": "${user.id}"}');
-      await supabase.rpc(
-        'unlike_post',
-        params: {
-          'post_id': postId,
-          'user_id': user.id,
-        },
-      );
-      _logger.info('RPC function "unlike_post" executed successfully');
+      _logger.info('Deleting like from post_likes');
+      await supabase
+          .from('post_likes')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', user.id);
+      _logger.info('Like removed successfully');
 
       return true;
     } catch (e) {

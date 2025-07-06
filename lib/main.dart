@@ -6,19 +6,19 @@ import 'login_screen.dart';
 import 'signup_screen.dart';
 import 'home_screen.dart';
 import 'artvault_screen.dart';
-import 'notifications_screen.dart';
+import 'realtime_notifications_screen.dart';
 import 'pinboards.dart';
 import 'profile.dart';
 import 'supabase_service.dart';
 import 'package:logging/logging.dart';
 import 'createpost_screen.dart';
 import 'edit_profile_screen.dart';
-import 'package:firebase_core/firebase_core.dart';
+
 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
     if (record.level.value >= Logger.root.level.value) {

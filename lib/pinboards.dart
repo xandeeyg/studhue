@@ -39,11 +39,11 @@ class _PinboardsScreenState extends State<PinboardsScreen> {
           children: [
             // Top Nav
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Image.asset('graphics/Homeheader.png', height: 32),
+                  Image.asset('graphics/Logo A.png', height: 70),
                   Row(
                     children: [
                       IconButton(
