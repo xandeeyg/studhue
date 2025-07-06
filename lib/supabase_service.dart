@@ -1244,10 +1244,15 @@ class SupabaseService {
       }
 
       // Start a transaction
+      _logger.info('Calling RPC function "like_post" with params: {"post_id": "$postId", "user_id": "${user.id}"}');
       await supabase.rpc(
         'like_post',
-        params: {'p_post_id': postId, 'p_user_id': user.id},
+        params: {
+          'post_id': postId,
+          'user_id': user.id,
+        },
       );
+      _logger.info('RPC function "like_post" executed successfully');
 
       return true;
     } catch (e) {
@@ -1262,10 +1267,15 @@ class SupabaseService {
       if (user == null) throw Exception("Not logged in");
 
       // Start a transaction
+      _logger.info('Calling RPC function "unlike_post" with params: {"post_id": "$postId", "user_id": "${user.id}"}');
       await supabase.rpc(
         'unlike_post',
-        params: {'post_id': postId, 'user_id': user.id},
+        params: {
+          'post_id': postId,
+          'user_id': user.id,
+        },
       );
+      _logger.info('RPC function "unlike_post" executed successfully');
 
       return true;
     } catch (e) {

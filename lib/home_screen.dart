@@ -106,13 +106,16 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _showPinboardsDialog(BuildContext context, Post post) async {
-    final List<PinboardInfo> userPinboards = await SupabaseService.getUserPinboards();
+    final List<PinboardInfo> userPinboards =
+        await SupabaseService.getUserPinboards();
 
     if (!mounted) return; // Check if the widget is still in the tree
 
     if (userPinboards.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You have no pinboards. Create one first!')),
+        const SnackBar(
+          content: Text('You have no pinboards. Create one first!'),
+        ),
       );
       return;
     }
@@ -121,7 +124,12 @@ class HomeScreenState extends State<HomeScreen> {
     List<bool> isPostOnEachPinboard = [];
     try {
       isPostOnEachPinboard = await Future.wait(
-        userPinboards.map((pinboard) => SupabaseService.isPostOnPinboard(post.id, pinboard.id)).toList(),
+        userPinboards
+            .map(
+              (pinboard) =>
+                  SupabaseService.isPostOnPinboard(post.id, pinboard.id),
+            )
+            .toList(),
       );
     } catch (e) {
       if (!mounted) return;
@@ -130,7 +138,7 @@ class HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
-    
+
     if (!mounted) return; // Re-check after async operations
 
     showDialog(
@@ -139,7 +147,10 @@ class HomeScreenState extends State<HomeScreen> {
         // Use a StatefulWidget for the dialog content if it needs its own internal state management for checkboxes
         // For simplicity here, we'll manage it by rebuilding the dialog or relying on the post-action refresh
         return AlertDialog(
-          title: Text('Save to Pinboard', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          title: Text(
+            'Save to Pinboard',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           contentPadding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 0),
           content: SizedBox(
             width: double.maxFinite,
@@ -158,16 +169,24 @@ class HomeScreenState extends State<HomeScreen> {
                       Navigator.pop(dialogContext); // Close dialog immediately
 
                       bool success;
-                      if (isPinnedToThisBoard) { // If it was pinned, unpin it
-                        success = await SupabaseService.removePostFromPinboard(post.id, pinboard.id);
-                      } else { // If it was not pinned, pin it
-                        success = await SupabaseService.addPostToPinboard(post.id, pinboard.id);
+                      if (isPinnedToThisBoard) {
+                        // If it was pinned, unpin it
+                        success = await SupabaseService.removePostFromPinboard(
+                          post.id,
+                          pinboard.id,
+                        );
+                      } else {
+                        // If it was not pinned, pin it
+                        success = await SupabaseService.addPostToPinboard(
+                          post.id,
+                          pinboard.id,
+                        );
                       }
 
                       if (!mounted) return;
                       if (success) {
                         // Refresh all posts to update isBookmarked status correctly
-                        _loadUsernameAndPosts(); 
+                        _loadUsernameAndPosts();
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Failed to update pinboard.')),
@@ -176,23 +195,30 @@ class HomeScreenState extends State<HomeScreen> {
                     },
                     activeColor: Color(0xFF5E4AD4), // Theme color
                   ),
-                  onTap: () async { // Also allow tapping the row
-                     if (!mounted) return;
-                      Navigator.pop(dialogContext);
-                      bool success;
-                      if (isPinnedToThisBoard) {
-                        success = await SupabaseService.removePostFromPinboard(post.id, pinboard.id);
-                      } else {
-                        success = await SupabaseService.addPostToPinboard(post.id, pinboard.id);
-                      }
-                      if (!mounted) return;
-                      if (success) {
-                        _loadUsernameAndPosts();
-                      } else {
-                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to update pinboard.')),
-                        );
-                      }
+                  onTap: () async {
+                    // Also allow tapping the row
+                    if (!mounted) return;
+                    Navigator.pop(dialogContext);
+                    bool success;
+                    if (isPinnedToThisBoard) {
+                      success = await SupabaseService.removePostFromPinboard(
+                        post.id,
+                        pinboard.id,
+                      );
+                    } else {
+                      success = await SupabaseService.addPostToPinboard(
+                        post.id,
+                        pinboard.id,
+                      );
+                    }
+                    if (!mounted) return;
+                    if (success) {
+                      _loadUsernameAndPosts();
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to update pinboard.')),
+                      );
+                    }
                   },
                 );
               },
@@ -200,7 +226,10 @@ class HomeScreenState extends State<HomeScreen> {
           ),
           actions: [
             TextButton(
-              child: const Text('Close', style: TextStyle(color: Color(0xFF5E4AD4))), // Theme color
+              child: const Text(
+                'Close',
+                style: TextStyle(color: Color(0xFF5E4AD4)),
+              ), // Theme color
               onPressed: () {
                 Navigator.pop(dialogContext);
               },
@@ -218,65 +247,81 @@ class HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: _isSearchBarVisible
-            ? SearchBarWidget(
-                controller: _searchController,
-                onChanged: _performSearch,
-              )
-            : Image.asset('graphics/Homeheader.png', height: 32),
+        title:
+            _isSearchBarVisible
+                ? SearchBarWidget(
+                  controller: _searchController,
+                  onChanged: _performSearch,
+                )
+                : Image.asset('graphics/Homeheader.png', height: 32),
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: _toggleSearchBar,
           ),
-          IconButton(icon: const Icon(Icons.chat_bubble_outline), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.notifications_none_outlined), onPressed: () {
-            Navigator.pushNamed(context, "/notifications");
-          }),
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications_none_outlined),
+            onPressed: () {
+              Navigator.pushNamed(context, "/notifications");
+            },
+          ),
         ],
       ),
       body: Stack(
         children: [
           Padding(
             padding: const EdgeInsets.only(bottom: 70), // space for nav bar
-            child: _isSearchBarVisible && _searchController.text.isNotEmpty
-                ? _buildSearchResults()
-                : FutureBuilder<List<Post>>(
-                    future: _postsFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      } else if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}'));
-                      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return const Center(child: Text('No posts available.'));
-                      }
+            child:
+                _isSearchBarVisible && _searchController.text.isNotEmpty
+                    ? _buildSearchResults()
+                    : FutureBuilder<List<Post>>(
+                      future: _postsFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        } else if (snapshot.hasError) {
+                          return Center(
+                            child: Text('Error: ${snapshot.error}'),
+                          );
+                        } else if (!snapshot.hasData ||
+                            snapshot.data!.isEmpty) {
+                          return const Center(
+                            child: Text('No posts available.'),
+                          );
+                        }
 
-                      final posts = snapshot.data!;
+                        final posts = snapshot.data!;
 
-                      return ListView.builder(
-                        padding: EdgeInsets.zero,
-                        itemCount: posts.length,
-                        itemBuilder: (context, index) {
-                          final post = posts[index];
-                          return _buildPost(post);
-                        },
-                      );
-                    },
-                  ),
+                        return ListView.builder(
+                          padding: EdgeInsets.zero,
+                          itemCount: posts.length,
+                          itemBuilder: (context, index) {
+                            final post = posts[index];
+                            return _buildPost(post);
+                          },
+                        );
+                      },
+                    ),
           ),
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
             child: Container(
-              height: 60,
+              height: 55,
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withAlpha((0.5 * 255).round()),
+                    color: Colors.black.withOpacity(0.1),
                     blurRadius: 10,
                     offset: const Offset(0, -2),
                   ),
@@ -286,37 +331,42 @@ class HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.home),
+                    icon: const Icon(Icons.home, size: 28),
                     color: const Color.fromRGBO(20, 193, 225, 100),
                     onPressed: () {
                       Navigator.pushNamed(context, "/home");
                     },
                   ),
                   IconButton(
-                    icon: const Icon(CupertinoIcons.pin),
+                    icon: const Icon(CupertinoIcons.pin, size: 24),
                     onPressed: () {
                       Navigator.pushNamed(context, "/pinboards");
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.add_box_outlined),
-                    onPressed: () async {
-                      final result = await Navigator.pushNamed(context, "/createpost");
-                      if (result == true && mounted) {
-                        setState(() {
-                          _postsFuture = SupabaseService.getPosts();
-                        });
-                      }
-                    },
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Color(0xff14c1e1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    onPressed:
+                        () => Navigator.pushNamed(context, "/createpost"),
                   ),
                   IconButton(
-                    icon: const Icon(LucideIcons.vault),
+                    icon: const Icon(LucideIcons.vault, size: 25),
                     onPressed: () {
                       Navigator.pushNamed(context, "/vault");
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.person_outline),
+                    icon: const Icon(Icons.person_outline, size: 28),
                     onPressed: () {
                       Navigator.pushNamed(context, "/profile");
                     },
@@ -338,7 +388,9 @@ class HomeScreenState extends State<HomeScreen> {
       return const Center(child: Text('No users found.'));
     }
     if (_searchResults.isEmpty && _searchController.text.isEmpty) {
-      return const Center(child: Text('Type to search for users.')); // Or any placeholder
+      return const Center(
+        child: Text('Type to search for users.'),
+      ); // Or any placeholder
     }
 
     return ListView.builder(
@@ -348,9 +400,11 @@ class HomeScreenState extends State<HomeScreen> {
         // Navigate to user's profile on tap, or implement other interaction
         return ListTile(
           leading: CircleAvatar(
-            backgroundImage: user.iconPath != null && user.iconPath!.startsWith('http')
-                ? NetworkImage(user.iconPath!)
-                : AssetImage(user.iconPath ?? 'graphics/Profile Icon.png') as ImageProvider,
+            backgroundImage:
+                user.iconPath != null && user.iconPath!.startsWith('http')
+                    ? NetworkImage(user.iconPath!)
+                    : AssetImage(user.iconPath ?? 'graphics/Profile Icon.png')
+                        as ImageProvider,
           ),
           title: Text(user.fullName.isNotEmpty ? user.fullName : user.username),
           subtitle: Text(user.profession ?? 'No profession listed'),
@@ -386,7 +440,9 @@ class HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => UserProfileScreen(username: post.username),
+                          builder:
+                              (context) =>
+                                  UserProfileScreen(username: post.username),
                         ),
                       );
                     } else {
@@ -412,7 +468,10 @@ class HomeScreenState extends State<HomeScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => UserProfileScreen(username: post.username),
+                                  builder:
+                                      (context) => UserProfileScreen(
+                                        username: post.username,
+                                      ),
                                 ),
                               );
                             } else {
@@ -441,10 +500,7 @@ class HomeScreenState extends State<HomeScreen> {
                     ),
                     Text(
                       post.profession,
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12,
-                      ),
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   ],
                 ),
@@ -460,7 +516,8 @@ class HomeScreenState extends State<HomeScreen> {
                           return AlertDialog(
                             title: const Text('Delete Post'),
                             content: const Text(
-                                'Are you sure you want to delete this post?'),
+                              'Are you sure you want to delete this post?',
+                            ),
                             actions: [
                               TextButton(
                                 child: const Text('Cancel'),
@@ -494,70 +551,94 @@ class HomeScreenState extends State<HomeScreen> {
             ),
           // Action buttons (like, comment, share, bookmark)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
                     StatefulBuilder(
-  builder: (context, setState) {
-    // Create local state variables that start with the post's values
-    bool isLiked = post.isLiked;
-    int likesCount = post.likesCount;
-    bool isLiking = false;
-    
-    return IconButton(
-      icon: Icon(
-        isLiked ? LucideIcons.heart : LucideIcons.heart,
-        color: isLiked ? Colors.red : Colors.black,
-        size: 28,
-      ),
-      onPressed: isLiking
-          ? null
-          : () async {
-              setState(() => isLiking = true);
-              bool success;
-              
-              if (!isLiked) {
-                // Like the post
-                success = await SupabaseService.likePost(post.id);
-                if (success) {
-                  setState(() {
-                    isLiked = true;
-                    likesCount++;
-                    // Update the post object itself to maintain consistency
-                    post.isLiked = true;
-                    post.likesCount = likesCount;
-                  });
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to like post.')),
-                  );
-                }
-              } else {
-                // Unlike the post
-                success = await SupabaseService.unlikePost(post.id);
-                if (success) {
-                  setState(() {
-                    isLiked = false;
-                    likesCount = likesCount > 0 ? likesCount - 1 : 0;
-                    // Update the post object itself to maintain consistency
-                    post.isLiked = false;
-                    post.likesCount = likesCount;
-                  });
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to unlike post.')),
-                  );
-                }
-              }
-              
-              setState(() => isLiking = false);
-            },
-    );
-  },
-),
+                      builder: (context, setState) {
+                        // Create local state variables that start with the post's values
+                        bool isLiked = post.isLiked;
+                        int likesCount = post.likesCount;
+                        bool isLiking = false;
+
+                        return IconButton(
+                          icon: Icon(
+                            isLiked ? LucideIcons.heart : LucideIcons.heart,
+                            color: isLiked ? Colors.red : Colors.black,
+                            size: 28,
+                          ),
+                          onPressed:
+                              isLiking
+                                  ? null
+                                  : () async {
+                                    setState(() => isLiking = true);
+                                    bool success;
+
+                                    if (!isLiked) {
+                                      // Like the post
+                                      success = await SupabaseService.likePost(
+                                        post.id,
+                                      );
+                                      if (success) {
+                                        setState(() {
+                                          isLiked = true;
+                                          likesCount++;
+                                          // Update the post object itself to maintain consistency
+                                          post.isLiked = true;
+                                          post.likesCount = likesCount;
+                                        });
+                                      } else {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Failed to like post.',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    } else {
+                                      // Unlike the post
+                                      success =
+                                          await SupabaseService.unlikePost(
+                                            post.id,
+                                          );
+                                      if (success) {
+                                        setState(() {
+                                          isLiked = false;
+                                          likesCount =
+                                              likesCount > 0
+                                                  ? likesCount - 1
+                                                  : 0;
+                                          // Update the post object itself to maintain consistency
+                                          post.isLiked = false;
+                                          post.likesCount = likesCount;
+                                        });
+                                      } else {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Failed to unlike post.',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    }
+
+                                    setState(() => isLiking = false);
+                                  },
+                        );
+                      },
+                    ),
                     IconButton(
                       icon: const Icon(LucideIcons.message_circle, size: 28),
                       onPressed: () {},
@@ -576,7 +657,10 @@ class HomeScreenState extends State<HomeScreen> {
                     children: [
                       // Existing SHOP NOW button
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           border: Border.all(color: Colors.blue),
                           borderRadius: BorderRadius.circular(4),
@@ -590,20 +674,27 @@ class HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8), // Add some spacing between buttons
+                      const SizedBox(
+                        width: 8,
+                      ), // Add some spacing between buttons
                       // Add to Cart button
                       ElevatedButton.icon(
                         onPressed: () async {
-                          final currentUser = SupabaseService.supabase.auth.currentUser;
+                          final currentUser =
+                              SupabaseService.supabase.auth.currentUser;
                           if (currentUser == null) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Please sign in to add items to cart')),
+                                const SnackBar(
+                                  content: Text(
+                                    'Please sign in to add items to cart',
+                                  ),
+                                ),
                               );
                             }
                             return;
                           }
-                          
+
                           try {
                             // Add to cart
                             final cartSuccess = await SupabaseService.addToCart(
@@ -627,14 +718,14 @@ class HomeScreenState extends State<HomeScreen> {
                                 imageUrl: post.postImagePath,
                               );
                             }
-                            
+
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    cartSuccess 
-                                      ? 'Added to cart and vault!' 
-                                      : 'Failed to add to cart. Please try again.',
+                                    cartSuccess
+                                        ? 'Added to cart and vault!'
+                                        : 'Failed to add to cart. Please try again.',
                                   ),
                                 ),
                               );
@@ -643,16 +734,23 @@ class HomeScreenState extends State<HomeScreen> {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Error adding to vault. Please try again.'),
+                                  content: Text(
+                                    'Error adding to vault. Please try again.',
+                                  ),
                                 ),
                               );
                             }
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF5E4AD4), // Theme color
+                          backgroundColor: const Color(
+                            0xFF5E4AD4,
+                          ), // Theme color
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -673,7 +771,10 @@ class HomeScreenState extends State<HomeScreen> {
                   icon: Icon(
                     post.isBookmarked ? Icons.bookmark : Icons.bookmark_border,
                     size: 28,
-                    color: post.isBookmarked ? Color(0xFF5E4AD4) : Colors.black, // Theme color if bookmarked
+                    color:
+                        post.isBookmarked
+                            ? Color(0xFF5E4AD4)
+                            : Colors.black, // Theme color if bookmarked
                   ),
                   onPressed: () {
                     _showPinboardsDialog(context, post);
@@ -689,12 +790,12 @@ class HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-  '${post.likesCount} likes',
-  style: const TextStyle(
-    fontWeight: FontWeight.bold,
-    fontSize: 14,
-  ),
-),
+                  '${post.likesCount} likes',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 if (post.caption.isNotEmpty)
                   RichText(
@@ -709,14 +810,6 @@ class HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   ),
-                const SizedBox(height: 4),
-                const Text(
-                  'View all 42 comments', // Placeholder for comment count
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 14,
-                  ),
-                ),
                 const SizedBox(height: 4),
                 Text(
                   _formatTimeAgo(post.postDate),
@@ -757,7 +850,11 @@ class SearchBarWidget extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
 
-  const SearchBarWidget({super.key, required this.controller, required this.onChanged});
+  const SearchBarWidget({
+    super.key,
+    required this.controller,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
