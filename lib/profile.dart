@@ -17,6 +17,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? profileData;
   bool isLoading = true;
   List<Map<String, dynamic>> userPosts = [];
+  List<Map<String, dynamic>> userProducts = []; // only is_product == true
   final _supabase = Supabase.instance.client;
 
   Future<void> loadProfile() async {
@@ -101,9 +102,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         print('DEBUG: User posts: ${posts.length}');
 
+        // Separate regular posts and product posts
+        final List<Map<String, dynamic>> allPosts = List<Map<String, dynamic>>.from(posts);
+        final List<Map<String, dynamic>> productsOnly = allPosts.where((p) => p['is_product'] == true || p['is_product'] == 1 || p['is_product'] == 't' || p['is_product'] == 'true').toList();
+        final List<Map<String, dynamic>> regularOnly = allPosts.where((p) => !(p['is_product'] == true || p['is_product'] == 1 || p['is_product'] == 't' || p['is_product'] == 'true')).toList();
+
         setState(() {
           profileData = fetchedProfileData; // This already contains the counts
-          userPosts = List<Map<String, dynamic>>.from(posts);
+          userProducts = productsOnly;
+          userPosts = regularOnly;
           isLoading = false;
         });
       } catch (postsError) {
@@ -494,7 +501,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
 
                             // Products Tab
-                            const Center(child: Text("No products available")),
+                            userProducts.isEmpty
+                                ? const Center(
+                                  child: Text(
+                                    'No products yet',
+                                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                                  ),
+                                )
+                                : GridView.builder(
+                                  padding: const EdgeInsets.all(10),
+                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    crossAxisSpacing: 5,
+                                    mainAxisSpacing: 5,
+                                  ),
+                                  itemCount: userProducts.length,
+                                  itemBuilder: (context, index) {
+                                    final product = userProducts[index];
+                                    return GestureDetector(
+                                      onTap: () {
+                                        // TODO: Show product post details
+                                      },
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: product['image_url'] != null
+                                            ? Image.network(
+                                              product['image_url'],
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => Container(color: Colors.grey[200], child: const Icon(Icons.error)),
+                                            )
+                                            : Container(color: Colors.grey[200], child: const Icon(Icons.image_not_supported)),
+                                      ),
+                                    );
+                                  },
+                                ),
                           ],
                         ),
                       ),
