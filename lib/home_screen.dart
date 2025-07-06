@@ -403,8 +403,7 @@ class HomeScreenState extends State<HomeScreen> {
             backgroundImage:
                 user.iconPath != null && user.iconPath!.startsWith('http')
                     ? NetworkImage(user.iconPath!)
-                    : AssetImage(user.iconPath ?? 'graphics/Profile Icon.png')
-                        as ImageProvider,
+                    : const AssetImage('graphics/Profile Icon.png'),
           ),
           title: Text(user.fullName.isNotEmpty ? user.fullName : user.username),
           subtitle: Text(user.profession ?? 'No profession listed'),
@@ -451,7 +450,11 @@ class HomeScreenState extends State<HomeScreen> {
                     }
                   },
                   child: CircleAvatar(
-                    backgroundImage: NetworkImage(post.iconPath),
+                    backgroundImage:
+                        post.iconPath.isNotEmpty &&
+                                post.iconPath.startsWith('http')
+                            ? NetworkImage(post.iconPath)
+                            : const AssetImage('graphics/Profile Icon.png'),
                     radius: 20,
                   ),
                 ),
@@ -648,38 +651,21 @@ class HomeScreenState extends State<HomeScreen> {
                       icon: const Icon(LucideIcons.send, size: 25),
                       onPressed: () {},
                     ),
-                  ],
-                ),
-                // Product details section
-                if (post.isProduct &&
-                    post.productname != null &&
-                    post.productname!.isNotEmpty)
-                  Row(
-                    children: [
-                      // Existing SHOP NOW button
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
+                    // Cart button
+                    if (post.isProduct &&
+                        post.productname != null &&
+                        post.productname!.isNotEmpty)
+                      IconButton(
+                        icon: Icon(
+                          post.isBookmarked
+                              ? LucideIcons.shopping_bag
+                              : LucideIcons.shopping_bag,
+                          color:
+                              post.isBookmarked
+                                  ? const Color.fromARGB(255, 250, 221, 4)
+                                  : Colors.black,
+                          size: 25,
                         ),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.blue),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'SHOP NOW',
-                          style: TextStyle(
-                            color: Colors.blue,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(
-                        width: 8,
-                      ), // Add some spacing between buttons
-                      // Add to Cart button
-                      ElevatedButton.icon(
                         onPressed: () async {
                           final currentUser =
                               SupabaseService.supabase.auth.currentUser;
@@ -743,35 +729,14 @@ class HomeScreenState extends State<HomeScreen> {
                             }
                           }
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(
-                            0xFF5E4AD4,
-                          ), // Theme color
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        icon: const Icon(Icons.shopping_cart, size: 16),
-                        label: const Text(
-                          'ADD TO CART',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                       ),
-                    ],
-                  ),
+                  ],
+                ),
                 const Spacer(),
                 IconButton(
                   icon: Icon(
-                    post.isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                    size: 25,
+                    post.isBookmarked ? LucideIcons.pin : LucideIcons.pin,
+                    size: 24,
                     color:
                         post.isBookmarked
                             ? Color(0xFF5E4AD4)
