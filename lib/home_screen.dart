@@ -253,7 +253,7 @@ class HomeScreenState extends State<HomeScreen> {
                   controller: _searchController,
                   onChanged: _performSearch,
                 )
-                : Image.asset('graphics/Homeheader.png', height: 32),
+                : Image.asset('graphics/Logo A.png', height: 70),
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
@@ -561,7 +561,7 @@ class HomeScreenState extends State<HomeScreen> {
                 Row(
                   children: [
                     StatefulBuilder(
-                      builder: (context, setState) {
+                      builder: (context, sbSetState) {
                         // Create local state variables that start with the post's values
                         bool isLiked = post.isLiked;
                         int likesCount = post.likesCount;
@@ -571,13 +571,13 @@ class HomeScreenState extends State<HomeScreen> {
                           icon: Icon(
                             isLiked ? LucideIcons.heart : LucideIcons.heart,
                             color: isLiked ? Colors.red : Colors.black,
-                            size: 28,
+                            size: 25,
                           ),
                           onPressed:
                               isLiking
                                   ? null
                                   : () async {
-                                    setState(() => isLiking = true);
+                                    sbSetState(() => isLiking = true);
                                     bool success;
 
                                     if (!isLiked) {
@@ -586,13 +586,14 @@ class HomeScreenState extends State<HomeScreen> {
                                         post.id,
                                       );
                                       if (success) {
-                                        setState(() {
+                                        sbSetState(() {
                                           isLiked = true;
                                           likesCount++;
-                                          // Update the post object itself to maintain consistency
-                                          post.isLiked = true;
-                                          post.likesCount = likesCount;
                                         });
+                                        // update underlying post model then rebuild outer widget
+                                        post.isLiked = true;
+                                        post.likesCount = likesCount;
+                                        if (mounted) setState(() {});
                                       } else {
                                         ScaffoldMessenger.of(
                                           context,
@@ -611,16 +612,16 @@ class HomeScreenState extends State<HomeScreen> {
                                             post.id,
                                           );
                                       if (success) {
-                                        setState(() {
+                                        sbSetState(() {
                                           isLiked = false;
                                           likesCount =
                                               likesCount > 0
                                                   ? likesCount - 1
                                                   : 0;
-                                          // Update the post object itself to maintain consistency
-                                          post.isLiked = false;
-                                          post.likesCount = likesCount;
                                         });
+                                        post.isLiked = false;
+                                        post.likesCount = likesCount;
+                                        if (mounted) setState(() {});
                                       } else {
                                         ScaffoldMessenger.of(
                                           context,
@@ -640,11 +641,11 @@ class HomeScreenState extends State<HomeScreen> {
                       },
                     ),
                     IconButton(
-                      icon: const Icon(LucideIcons.message_circle, size: 28),
+                      icon: const Icon(LucideIcons.message_circle, size: 25),
                       onPressed: () {},
                     ),
                     IconButton(
-                      icon: const Icon(LucideIcons.send, size: 28),
+                      icon: const Icon(LucideIcons.send, size: 25),
                       onPressed: () {},
                     ),
                   ],
@@ -770,7 +771,7 @@ class HomeScreenState extends State<HomeScreen> {
                 IconButton(
                   icon: Icon(
                     post.isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                    size: 28,
+                    size: 25,
                     color:
                         post.isBookmarked
                             ? Color(0xFF5E4AD4)
