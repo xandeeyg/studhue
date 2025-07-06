@@ -59,6 +59,7 @@ class Post {
   final double? price;
   int likesCount;
   bool isLiked;
+  bool isInCart;
   final bool isBookmarked;
 
   Post({
@@ -78,6 +79,7 @@ class Post {
     this.price,
     this.likesCount = 0,
     this.isLiked = false,
+    this.isInCart = false,
     this.isBookmarked = false,
   });
 
@@ -103,6 +105,7 @@ class Post {
       likesCount: json['likecount'] as int? ?? 0,
       isLiked: json['isLiked'] as bool? ?? false,
       isBookmarked: json['is_bookmarked'] as bool? ?? false,
+      isInCart: json['is_in_cart'] as bool? ?? false,
     );
   }
 }
@@ -1181,6 +1184,28 @@ class SupabaseService {
         _logger.severe('Postgrest error details: ${e.message}');
       }
       rethrow; // Rethrow to see the full error in the UI
+    }
+  }
+
+  // Remove item from cart/vault_items
+  static Future<bool> removeFromCart(
+    String userId,
+    String productName, {
+    String? variation,
+  }) async {
+    try {
+      final variationValue = variation ?? '';
+      await supabase
+          .from('vault_items')
+          .delete()
+          .eq('user_id', userId)
+          .eq('product_name', productName)
+          .eq('variation', variationValue);
+      _logger.info('Removed $productName ($variationValue) from cart for user $userId');
+      return true;
+    } catch (e) {
+      _logger.severe('Error removing item from cart: $e');
+      return false;
     }
   }
 

@@ -655,79 +655,102 @@ class HomeScreenState extends State<HomeScreen> {
                     if (post.isProduct &&
                         post.productname != null &&
                         post.productname!.isNotEmpty)
-                      IconButton(
-                        icon: Icon(
-                          post.isBookmarked
-                              ? LucideIcons.shopping_bag
-                              : LucideIcons.shopping_bag,
-                          color:
-                              post.isBookmarked
-                                  ? const Color.fromARGB(255, 250, 221, 4)
-                                  : Colors.black,
-                          size: 25,
-                        ),
-                        onPressed: () async {
-                          final currentUser =
-                              SupabaseService.supabase.auth.currentUser;
-                          if (currentUser == null) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Please sign in to add items to cart',
-                                  ),
-                                ),
-                              );
-                            }
-                            return;
-                          }
+                      StatefulBuilder(
+                        builder: (context, cartSetState) {
+                          bool isInCart = post.isInCart;
+                          bool working = false;
 
-                          try {
-                            // Add to cart
-                            final cartSuccess = await SupabaseService.addToCart(
-                              currentUser.id,
-                              post.id,
-                              post.productname!,
-                              post.variation,
-                              post.price ?? 0.0,
-                              post.postImagePath,
-                            );
+                          return IconButton(
+                            icon: Icon(
+                              LucideIcons.shopping_bag,
+                              color:
+                                  isInCart
+                                      ? const Color.fromARGB(255, 250, 221, 4)
+                                      : Colors.black,
+                              size: 25,
+                            ),
+                            onPressed:
+                                working
+                                    ? null
+                                    : () async {
+                                      cartSetState(() => working = true);
+                                      final currentUser =
+                                          SupabaseService
+                                              .supabase
+                                              .auth
+                                              .currentUser;
+                                      if (currentUser == null) {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Please sign in first',
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                        cartSetState(() => working = false);
+                                        return;
+                                      }
 
-                            // Also add to vault
-                            if (cartSuccess) {
-                              await SupabaseService.addToVault(
-                                username: post.username,
-                                productname: post.productname!,
-                                variation: post.variation ?? '',
-                                quantity: 1, // Default quantity
-                                price: post.price ?? 0.0,
-                                iconUrl: post.iconPath,
-                                imageUrl: post.postImagePath,
-                              );
-                            }
+                                      bool actionSuccess = false;
+                                      if (!isInCart) {
+                                        actionSuccess =
+                                            await SupabaseService.addToCart(
+                                              currentUser.id,
+                                              post.id,
+                                              post.productname!,
+                                              post.variation,
+                                              post.price ?? 0.0,
+                                              post.postImagePath,
+                                            );
+                                        if (actionSuccess) {
+                                          await SupabaseService.addToVault(
+                                            username: post.username,
+                                            productname: post.productname!,
+                                            variation: post.variation ?? '',
+                                            quantity: 1,
+                                            price: post.price ?? 0.0,
+                                            iconUrl: post.iconPath,
+                                            imageUrl: post.postImagePath,
+                                          );
+                                          isInCart = true;
+                                          post.isInCart = true;
+                                        }
+                                      } else {
+                                        actionSuccess =
+                                            await SupabaseService.removeFromCart(
+                                              currentUser.id,
+                                              post.productname!,
+                                              variation: post.variation,
+                                            );
+                                        if (actionSuccess) {
+                                          isInCart = false;
+                                          post.isInCart = false;
+                                        }
+                                      }
 
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    cartSuccess
-                                        ? 'Added to cart and vault!'
-                                        : 'Failed to add to cart. Please try again.',
-                                  ),
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Error adding to vault. Please try again.',
-                                  ),
-                                ),
-                              );
-                            }
-                          }
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              actionSuccess
+                                                  ? (isInCart
+                                                      ? 'Added to vault!'
+                                                      : 'Removed from vault')
+                                                  : 'Action failed',
+                                            ),
+                                          ),
+                                        );
+                                      }
+
+                                      cartSetState(() => working = false);
+                                    },
+                          );
                         },
                       ),
                   ],
