@@ -519,13 +519,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               IconButton(
-                icon: const Icon(Icons.home, size: 28),
+                icon: const Icon(LucideIcons.house, size: 24),
                 onPressed: () {
                   Navigator.pushNamed(context, "/home");
                 },
               ),
               IconButton(
-                icon: const Icon(CupertinoIcons.pin, size: 24),
+                icon: const Icon(LucideIcons.pin, size: 22),
                 onPressed: () {
                   Navigator.pushNamed(context, "/pinboards");
                 },

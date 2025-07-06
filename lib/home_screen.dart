@@ -331,14 +331,14 @@ class HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.home, size: 28),
+                    icon: const Icon(LucideIcons.house, size: 24),
                     color: const Color.fromRGBO(20, 193, 225, 100),
                     onPressed: () {
                       Navigator.pushNamed(context, "/home");
                     },
                   ),
                   IconButton(
-                    icon: const Icon(CupertinoIcons.pin, size: 24),
+                    icon: const Icon(LucideIcons.pin, size: 22),
                     onPressed: () {
                       Navigator.pushNamed(context, "/pinboards");
                     },
@@ -360,7 +360,7 @@ class HomeScreenState extends State<HomeScreen> {
                         () => Navigator.pushNamed(context, "/createpost"),
                   ),
                   IconButton(
-                    icon: const Icon(LucideIcons.vault, size: 25),
+                    icon: const Icon(LucideIcons.vault, size: 24),
                     onPressed: () {
                       Navigator.pushNamed(context, "/vault");
                     },
