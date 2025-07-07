@@ -43,7 +43,7 @@ class _PinboardsScreenState extends State<PinboardsScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Image.asset('graphics/Logo A.png', height: 70),
+                  Image.asset("graphics/Logo A.png", height: 70),
                   Row(
                     children: [
                       IconButton(

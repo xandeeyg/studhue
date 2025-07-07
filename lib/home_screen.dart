@@ -253,7 +253,7 @@ class HomeScreenState extends State<HomeScreen> {
                   controller: _searchController,
                   onChanged: _performSearch,
                 )
-                : Image.asset('graphics/Logo A.png', height: 70),
+                : Image.asset("graphics/Logo A.png", height: 70),
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
